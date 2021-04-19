@@ -2,9 +2,9 @@
 pragma solidity >= 0.4.25 < 0.8.5;
 pragma experimental ABIEncoderV2;
 
-import "../client/node_modules/@openzeppelin/contracts/utils/Address.sol";
-import "../client/node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "../client/node_modules/@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "./ERC721/Address.sol";
+import "./ERC721/ERC165.sol";
+import "./ERC721/IERC721Receiver.sol";
 
 contract config  {
     using Address for address;
@@ -90,7 +90,6 @@ contract config  {
     mapping(uint => address) subtitleToApproved;//将某字幕授权给某地址操作.
     mapping(address => mapping(uint => bool)) userforsubvote;//限制对某个字幕只能评价一次.
     mapping(address => mapping(uint => mapping(string => bool))) onlyvoteone;//限制对某个视频只能投一个字幕.
-    mapping(uint => mapping(string => uint)) indexmap;// webindex 和 language 对 applyindex的映射，方便查找.
     mapping(uint => mapping(string => bool)) ifapply;//判断webindex该视频号是否已经申请过这种语言.
     mapping(address => mapping(address => bool)) ownerToOperators;
     
@@ -166,7 +165,6 @@ contract Subtitle_Function is config {
     
     function VideoApply (uint _webindex,string memory _videoname,string memory _videosource,string memory _language,uint _paytype,uint _paynumber) public  returns(uint){
         require(ifapply[_webindex][_language] == false);
-        require(_paytype >= 0 && _paytype < PayType.length);
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applypoints = 100;
             User[msg.sender].submitpoints = 100;
@@ -197,7 +195,6 @@ contract Subtitle_Function is config {
         User[msg.sender].applypoints += 1;
         videos[_webindex].ApplyLa.push(_language);
         ifapply[_webindex][_language] == true;
-        indexmap[_webindex][_language] = applyNumber; 
         emit applysubtitle(msg.sender,_webindex,_videoname,_language,_paytype,_paynumber);
         return applyNumber;
         
@@ -297,20 +294,20 @@ contract Subtitle_Function is config {
     }
     //查看该视频是否成功获得某语种的字幕.
     function checkApplyLa(uint _webindex,string memory _language)external view returns(bool) {
-        bool ifsucess;
-        ifsucess = videos[_webindex].Applys[_language].IfSucess;
-        return (ifsucess);
+        bool ifsuccess;
+        ifsuccess = videos[_webindex].Applys[_language].IfSucess;
+        return (ifsuccess);
     }
     //返回支付类型、支付金额、字幕作者和反馈人的地址.
     function returnRewardInfo(uint _webindex,string memory _language)external view returns(uint,uint,address,address[] memory) {
-        require(subvideos[indexmap[_webindex][_language]].IfSucess == true);
-        uint len = subtitles[subvideos[indexmap[_webindex][_language]].VideoSubtitles[subvideos[indexmap[_webindex][_language]].SuccessSubId]].topaddress.length;
+        require(videos[_webindex].Applys[_language].IfSucess == true);
+        uint len = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[videos[_webindex].Applys[_language].SuccessSubId]].top;
         address[] memory _fbaddress = new address[](len);
         uint addid;
         for (addid=0;addid<len;addid++){
-            _fbaddress[addid] = subtitles[subvideos[indexmap[_webindex][_language]].VideoSubtitles[subvideos[indexmap[_webindex][_language]].SuccessSubId]].topaddress[addid];
+            _fbaddress[addid] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[videos[_webindex].Applys[_language].SuccessSubId]].topaddress[addid];
         }
-        return (subvideos[indexmap[_webindex][_language]].PayType,subvideos[indexmap[_webindex][_language]].PayNumber,subvideos[indexmap[_webindex][_language]].SubOwner,_fbaddress);
+        return (videos[_webindex].Applys[_language].PayType,videos[_webindex].Applys[_language].PayNumber,videos[_webindex].Applys[_language].SubOwner,_fbaddress);
     }
     //服务于为外部视频平台的接口.
     //用于外部视频平台获取该视频所有上传字幕.
@@ -327,15 +324,6 @@ contract Subtitle_Function is config {
     function Subtitleinterface(uint _webindex,string memory _language) external view returns(string memory) {
         require(videos[_webindex].Applys[_language].IfSucess == true );
         return videos[_webindex].Applys[_language].SucSubaddress;
-    }
-    function checkSimhash(uint _webindex,string memory _language) public view returns(string[] memory){
-        require(videos[_webindex].Applys[_language].IfSucess == false);
-        uint len = videos[_webindex].Applys[_language].SubtitleNums;
-        string[] memory result = new string[](len);
-        for(uint id=0;id<len;id++){
-            result[id] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[id]].subtitlehash;
-        }
-        return result;
     }
     //为用户提供查询系统可公开信息的功能.
     //获得系统数目信息.
@@ -411,7 +399,7 @@ contract Subtitle_Function is config {
             for (uint i=0;i<len;i++) {
                 sumtop +=  subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].top;
             }
-            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && subtitles[index].top > 6 && rate >= 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 2 days ) {
+            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && subtitles[index].top > 5 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 2 days ) {
                 videos[_webindex].Applys[_language].IfSucess = true;
                 videos[_webindex].Applys[_language].SucSubaddress = subtitles[index].ipfsaddress;
                 videos[_webindex].Applys[_language].SuccessSubId = _subtitleindex;
@@ -505,7 +493,7 @@ contract Subtitle_ERC721 is Subtitle_Function{
     }
     //思想是用来给想要购买该字幕Token的人来使用.
     function getTokenInfo(uint _subtitleindex) public view returns(uint,address,string memory,uint,uint,bool){
-        //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
+         //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
         require((videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == false && subtitles[_subtitleindex].iftaking == false) || (videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == true && subtitles[_subtitleindex].iftaking == true));
         return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
     } 
