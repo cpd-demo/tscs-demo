@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SimPL-2.0
 pragma solidity >= 0.4.25 < 0.8.5;
 
-import "../client/node_modules/@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "./ERC777/ERC777.sol";
 interface FlowOracleInterface {
     function getFlow(uint _webindex) external view returns(uint,uint,address);
     function getSubFlow(uint _webindex,string memory _language) external view returns(uint,uint);
@@ -75,24 +75,22 @@ contract VideoToken is ERC777 {
            totalpaytoken = 0; 
            string[] memory applyla;
            (applynum,applyla) = SubtitleApply.getLanguage(_webindex);
-            reward(videowner,10);
             uint id;
            for (id = 0;id < applynum;id ++) {
-                loopGet(_webindex, applyla[id]);
-           } 
-        } 
+                loopGet(_webindex, applyla[id],totalvideotoken);
+           }
+        }
         if (totalvideotoken > totalpaytoken) {
-           gettoken = totalvideotoken - totalpaytoken;
-           reward(videowner,gettoken);
-           videosReward[_webindex].lastgettoken = gettoken;
-           videosReward[_webindex].totalgettoken += gettoken;
-           emit videoTokenReceived(videowner, gettoken);
+                gettoken = totalvideotoken - totalpaytoken;
+                reward(videowner,gettoken);
+                videosReward[_webindex].lastgettoken = gettoken;
+                videosReward[_webindex].totalgettoken += gettoken;
+                emit videoTokenReceived(videowner, gettoken);
         }
         videosReward[_webindex].lastflow = newvideoflow;
         videosReward[_webindex].lastgettime = block.timestamp;
     }
-    
-    function loopGet(uint _webindex,string memory _language) public {
+    function loopGet(uint _webindex,string memory _language,uint totalvideotoken) internal {
            uint paytype;
            uint paynumber;
            uint newsubflow;
@@ -120,16 +118,16 @@ contract VideoToken is ERC777 {
                       }
                   }else if(paytype == 1) {
                            if (videosReward[_webindex].subrecords[_language].create == false) {
-                           videosReward[_webindex].subrecords[_language].surplus = paynumber;
+                           videosReward[_webindex].subrecords[_language].surplus = paynumber*10**18;
                            videosReward[_webindex].subrecords[_language].create = true;
                            }
                            if (videosReward[_webindex].subrecords[_language].pay1success == false) {       
-                               if(totalsubtoken >= videosReward[_webindex].subrecords[_language].surplus) {    
+                               if(totalvideotoken >= videosReward[_webindex].subrecords[_language].surplus) {    
                                   subtokens = videosReward[_webindex].subrecords[_language].surplus;
                                   videosReward[_webindex].subrecords[_language].surplus = 0;
                                   videosReward[_webindex].subrecords[_language].pay1success = true;
                                 }else {
-                                  subtokens = totalsubtoken;
+                                  subtokens = totalvideotoken;
                                   videosReward[_webindex].subrecords[_language].surplus = videosReward[_webindex].subrecords[_language].surplus - subtokens;
                                 }       
                                 totalfbtoken = subtokens/(10**fbproportion);
@@ -142,7 +140,7 @@ contract VideoToken is ERC777 {
                             }
                     }
                     emit subTokenReceived(subowner,subtokens-totalfbtoken,fbtokens);
-                } 
+                }
     }
  
 
