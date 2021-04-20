@@ -79,15 +79,15 @@ contract VideoToken is ERC777 {
             uint id;
            for (id = 0;id < applynum;id ++) {
                 loopGet(_webindex, applyla[id]);
-           }
-            if (totalvideotoken > totalpaytoken) {
-                gettoken = totalvideotoken - totalpaytoken;
-                reward(videowner,gettoken);
-                videosReward[_webindex].lastgettoken = gettoken;
-                videosReward[_webindex].totalgettoken += gettoken;
-                emit videoTokenReceived(videowner, gettoken);
-            }
+           } 
         } 
+        if (totalvideotoken > totalpaytoken) {
+           gettoken = totalvideotoken - totalpaytoken;
+           reward(videowner,gettoken);
+           videosReward[_webindex].lastgettoken = gettoken;
+           videosReward[_webindex].totalgettoken += gettoken;
+           emit videoTokenReceived(videowner, gettoken);
+        }
         videosReward[_webindex].lastflow = newvideoflow;
         videosReward[_webindex].lastgettime = block.timestamp;
     }
