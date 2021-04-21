@@ -32,7 +32,11 @@ contract FlowOracle {
         uint subnewflow;
     }
     mapping(uint => VideoInfo) Videos;
-  
+    
+    uint WhitelistNumber;
+    mapping(address => bool) Whitelist;
+    event addWhiteList(address usr,uint index);
+    
     function updateOracle(address _neworacleaddress) public view{
         require(msg.sender == CEO);
         oracleAddress == _neworacleaddress;
@@ -65,6 +69,14 @@ contract FlowOracle {
     }
     function getSubFlow(uint _webindex,string memory _language) external view returns(uint,uint) {
         return (Videos[_webindex].Subs[_language].sublastflow,Videos[_webindex].Subs[_language].subnewflow);
+    }
+        function addWhiteListUsr(address _usr) external onlyoracleAddress returns(bool,uint) {
+        Whitelist[_usr] = true;
+        WhitelistNumber++;
+        return (true,WhitelistNumber);
+    }
+    function ifWhiteListUsr(address _usr) external view returns(bool) {
+        return Whitelist[_usr];
     }
 
 }
