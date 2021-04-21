@@ -5,8 +5,6 @@ contract FlowOracle {
     address public oracleAddress;
     address CEO;
     uint public updateTime;
-    event FlowUpdate(string videoname,string videosource,uint webindex,uint newupdate,uint flow);
-    event subFlowUpdate(string videoname,uint webindex,string _language,uint newupdate,uint flow);
     constructor(address  _oracleAddress, uint _updatetime) {
         oracleAddress = _oracleAddress;
         updateTime = _updatetime;
@@ -32,11 +30,10 @@ contract FlowOracle {
         uint subnewflow;
     }
     mapping(uint => VideoInfo) Videos;
-    
+    event FlowUpdate(string videoname,string videosource,uint webindex,uint newupdate,uint flow);
     uint WhitelistNumber;
     mapping(address => bool) Whitelist;
     event addWhiteList(address usr,uint index);
-    
     function updateOracle(address _neworacleaddress) public view{
         require(msg.sender == CEO);
         oracleAddress == _neworacleaddress;
@@ -47,6 +44,7 @@ contract FlowOracle {
         Videos[_webindex].videoname = _videoname;
         Videos[_webindex].videosource = _videosource;
         Videos[_webindex].videowner = _videowner;
+        Whitelist[_videowner] = true;
     }
     function updateFlow (uint _webindex,uint _flow,string memory _language,uint _subflow) external onlyoracleAddress {
         require(block.timestamp >= Videos[_webindex].lastupdate + updateTime);
@@ -62,7 +60,6 @@ contract FlowOracle {
         require(Videos[_webindex].ifcreate == true);
         Videos[_webindex].Subs[_language].sublastflow = Videos[_webindex].Subs[_language].subnewflow;
         Videos[_webindex].Subs[_language].subnewflow = _subflow;
-        emit subFlowUpdate(Videos[_webindex].videoname, _webindex, _language, block.timestamp, _subflow);
     }
     function getFlow(uint _webindex) external view returns(uint,uint,address) {
         return (Videos[_webindex].lastupdate,Videos[_webindex].newflow,Videos[_webindex].videowner);
@@ -70,13 +67,17 @@ contract FlowOracle {
     function getSubFlow(uint _webindex,string memory _language) external view returns(uint,uint) {
         return (Videos[_webindex].Subs[_language].sublastflow,Videos[_webindex].Subs[_language].subnewflow);
     }
-        function addWhiteListUsr(address _usr) external onlyoracleAddress returns(bool,uint) {
+    function addWhiteListUsr(address _usr) external onlyoracleAddress returns(bool,uint) {
         Whitelist[_usr] = true;
         WhitelistNumber++;
         return (true,WhitelistNumber);
     }
     function ifWhiteListUsr(address _usr) external view returns(bool) {
         return Whitelist[_usr];
+    }
+    function ifVideoOwner(uint webindex,address usr) external view returns(bool) {
+        require(Videos[webindex].videowner == usr);
+        return true;
     }
 
 }
