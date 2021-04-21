@@ -6,6 +6,11 @@ import "./ERC721/Address.sol";
 import "./ERC721/ERC165.sol";
 import "./ERC721/IERC721Receiver.sol";
 
+interface FlowOracleInterface {
+    function ifWhiteListUsr(address usr) external view returns(bool);
+    function ifVideoOwner(uint webindex,address usr) external view returns(bool);
+}
+
 contract config  {
     using Address for address;
     //合约默认属性.
@@ -119,6 +124,7 @@ contract config  {
         require(subtitles[_subtitleindex].subtitleowner != address(0));
         _;
     }
+
     //交易功能
     function _transfer(address _to, uint256 _tokenId) internal {
         require(_to != address(0));
@@ -160,11 +166,73 @@ contract config  {
         require(_checkOnERC721Received(_from, _to, _tokenId, _data),"ERC721: transfer to non ERC721Receiver implementer");
     }
 }
+contract Subtitle_ERC721 is config{
+    function approve(address _to,uint _subtitleindex)external canOperate(_subtitleindex) validNFToken(_subtitleindex) {
+        require(subtitles[_subtitleindex].subtitleowner != _to);
+        subtitleToApproved[_subtitleindex] = _to;
+        emit Approval(msg.sender, _to, _subtitleindex);
+    }
+    function getApproved(uint _subtitleindex) external view validNFToken(_subtitleindex) returns(address){
+        return subtitleToApproved[_subtitleindex];
+    }
+    function setApprovalForAll(address _operator, bool _approved) external {
+        ownerToOperators[msg.sender][_operator] = _approved;
+        emit ApprovalForAll(msg.sender, _operator, _approved);
+    }
+    function isApprovedForAll(address _owner, address _operator) external view returns(bool){
+        return ownerToOperators[_owner][_operator];
+    }
+    function transferFrom (address _from,address _to,uint _subtitleindex)external canTransfer(_subtitleindex) validNFToken(_subtitleindex){//transferSubtitle
+        address tokenowner = subtitles[_subtitleindex].subtitleowner;
+        require(tokenowner == _from);
+        _transfer(_to,_subtitleindex);
+    }
+    function safeTransferFrom(address _from,address _to,uint _tokenId,bytes calldata _data) external {
+        _safeTransferFrom(_from,_to,_tokenId,_data);
+    }
+    function safeTransferFrom(address _from,address _to,uint _tokenId) external {
+        _safeTransferFrom(_from,_to,_tokenId,"");
+        
+    }
+    //返回指定用户上传过的字幕序号.
+    function balanceOf(address _owner) external view returns(uint,uint[] memory) {//subtitlesOfOwner
+        uint subtitlecount = usersubmits[_owner];
+        uint[] memory result = new uint[](subtitlecount);
+        uint totalsubtitles = submitSubNumber;
+        uint resultIndex = 0;
+        uint subtitleid;
+        for(subtitleid = 1;subtitleid<=totalsubtitles;subtitleid++){
+            if(subtitles[subtitleid].subtitleowner == _owner){
+            result[resultIndex] = subtitleid;
+            resultIndex++;
+            }
+        }
+        return (subtitlecount,result);
+    }
+    function ownerOf(uint _subtitleindex)external view returns(address _owner) {
+        _owner = subtitles[_subtitleindex].subtitleowner;
+        require(_owner != address(0));
+    }
+    //思想是用来给想要购买该字幕Token的人来使用.
+    function getTokenInfo(uint _subtitleindex) public view returns(uint,address,string memory,uint,uint,bool){
+         //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
+        require((videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == false && subtitles[_subtitleindex].iftaking == false) || (videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == true && subtitles[_subtitleindex].iftaking == true));
+        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
+    } 
+}
 
-contract Subtitle_Function is config {
-    
-    function VideoApply (uint _webindex,string memory _videoname,string memory _videosource,string memory _language,uint _paytype,uint _paynumber) public  returns(uint){
+contract Subtitle_Function is Subtitle_ERC721 {
+    constructor(address _oracleaddr) {
+        Oracle = FlowOracleInterface(_oracleaddr); 
+    }
+    FlowOracleInterface Oracle;
+    modifier onlyWhiteListUsr(address _usr) {
+        require(Oracle.ifWhiteListUsr(_usr));
+        _;
+    }
+    function VideoApply (uint _webindex,string memory _videoname,string memory _videosource,string memory _language,uint _paytype,uint _paynumber) public returns(uint){
         require(ifapply[_webindex][_language] == false);
+        require(Oracle.ifVideoOwner(_webindex,msg.sender));
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applypoints = 100;
             User[msg.sender].submitpoints = 100;
@@ -200,7 +268,7 @@ contract Subtitle_Function is config {
         
     }
     
-    function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash) public returns(uint){
+    function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash) public  returns(uint){
         require(videos[_webindex].Applys[_language].IfSucess == false);
         require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
         require(keccak256(abi.encodePacked(videos[_webindex].VideoName)) == keccak256(abi.encodePacked(_videoname)) && keccak256(abi.encodePacked(videos[_webindex].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
@@ -377,7 +445,7 @@ contract Subtitle_Function is config {
          return true;
     }
     //只能对某个视频下的其中一个字幕作出点赞操作，但可以对多个字幕进行点踩操作，另外对同一字幕只能操作（赞或踩）一次且不能修改，
-    function Top (uint _webindex,string memory _language,uint _subtitleindex) external returns(bool){
+    function Top (uint _webindex,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
         uint index = videos[_webindex].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applypoints = 100;
@@ -399,7 +467,7 @@ contract Subtitle_Function is config {
             for (uint i=0;i<len;i++) {
                 sumtop +=  subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].top;
             }
-            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && subtitles[index].top > 5 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 2 days ) {
+            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {
                 videos[_webindex].Applys[_language].IfSucess = true;
                 videos[_webindex].Applys[_language].SucSubaddress = subtitles[index].ipfsaddress;
                 videos[_webindex].Applys[_language].SuccessSubId = _subtitleindex;
@@ -415,7 +483,7 @@ contract Subtitle_Function is config {
         return true;
     }
     //当踩的数目达到一定比例，应将恶意字幕删除（置空）,同时给予上传者积分减去惩罚.
-    function Step (uint _webindex,string memory _language,uint _subtitleindex) external returns(bool){
+    function Step (uint _webindex,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
         uint index = videos[_webindex].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applypoints = 100;
@@ -441,60 +509,4 @@ contract Subtitle_Function is config {
         }
         return true;
     }
-}
-
-contract Subtitle_ERC721 is Subtitle_Function{
-    
-    function approve(address _to,uint _subtitleindex)external canOperate(_subtitleindex) validNFToken(_subtitleindex){
-        require(subtitles[_subtitleindex].subtitleowner != _to);
-        subtitleToApproved[_subtitleindex] = _to;
-        emit Approval(msg.sender, _to, _subtitleindex);
-    }
-    function getApproved(uint _subtitleindex) external view validNFToken(_subtitleindex) returns(address){
-        return subtitleToApproved[_subtitleindex];
-    }
-    function setApprovalForAll(address _operator, bool _approved) external {
-        ownerToOperators[msg.sender][_operator] = _approved;
-        emit ApprovalForAll(msg.sender, _operator, _approved);
-    }
-    function isApprovedForAll(address _owner, address _operator) external view returns(bool){
-        return ownerToOperators[_owner][_operator];
-    }
-    function transferFrom (address _from,address _to,uint _subtitleindex)external canTransfer(_subtitleindex) validNFToken(_subtitleindex){//transferSubtitle
-        address tokenowner = subtitles[_subtitleindex].subtitleowner;
-        require(tokenowner == _from);
-        _transfer(_to,_subtitleindex);
-    }
-    function safeTransferFrom(address _from,address _to,uint _tokenId,bytes calldata _data) external {
-        _safeTransferFrom(_from,_to,_tokenId,_data);
-    }
-    function safeTransferFrom(address _from,address _to,uint _tokenId) external {
-        _safeTransferFrom(_from,_to,_tokenId,"");
-        
-    }
-    //返回指定用户上传过的字幕序号.
-    function balanceOf(address _owner) external view returns(uint,uint[] memory) {//subtitlesOfOwner
-        uint subtitlecount = usersubmits[_owner];
-        uint[] memory result = new uint[](subtitlecount);
-        uint totalsubtitles = submitSubNumber;
-        uint resultIndex = 0;
-        uint subtitleid;
-        for(subtitleid = 1;subtitleid<=totalsubtitles;subtitleid++){
-            if(subtitles[subtitleid].subtitleowner == _owner){
-            result[resultIndex] = subtitleid;
-            resultIndex++;
-            }
-        }
-        return (subtitlecount,result);
-    }
-    function ownerOf(uint _subtitleindex)external view returns(address _owner) {
-        _owner = subtitles[_subtitleindex].subtitleowner;
-        require(_owner != address(0));
-    }
-    //思想是用来给想要购买该字幕Token的人来使用.
-    function getTokenInfo(uint _subtitleindex) public view returns(uint,address,string memory,uint,uint,bool){
-         //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
-        require((videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == false && subtitles[_subtitleindex].iftaking == false) || (videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == true && subtitles[_subtitleindex].iftaking == true));
-        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
-    } 
 }
