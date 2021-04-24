@@ -393,6 +393,15 @@ contract Subtitle_Function is Subtitle_ERC721 {
         require(videos[_webindex].Applys[_language].IfSucess == true );
         return videos[_webindex].Applys[_language].SucSubaddress;
     }
+    //专用于外部平台获取simhash比较.
+    function getSimhash(uint _webindex,string memory _language) external view returns(uint,string[] memory){
+        uint num = videos[_webindex].Applys[_language].SubtitleNums;
+        string[] memory simhashs = new string[](num);
+        for(uint i=0;i<num;i++){
+            simhashs[i] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].subtitlehash;
+        }
+        return (num,simhashs);
+    }
     //为用户提供查询系统可公开信息的功能.
     //获得系统数目信息.
     function getTotalVideos() external view returns(uint) {
