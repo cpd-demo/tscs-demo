@@ -30,7 +30,7 @@ contract FlowOracle {
         uint subnewflow;
     }
     mapping(uint => VideoInfo) Videos;
-    mapping(uint => mapping(string => bool)) clearThrough;
+    //mapping(uint => mapping(string => bool)) clearThrough;
     event FlowUpdate(string videoname,string videosource,uint webindex,uint newupdate,uint flow);
     uint WhitelistNumber;
     mapping(address => bool) Whitelist;
@@ -80,9 +80,9 @@ contract FlowOracle {
         require(Videos[webindex].videowner == usr);
         return true;
     }
-    function confirmThrough(uint _webindex,string memory _simhash)external onlyoracleAddress returns(bool){
-        clearThrough[_webindex][_simhash] = true;
-        return true;
-    }
+    //function confirmThrough(uint _webindex,string memory _simhash)external onlyoracleAddress returns(bool){
+    //    clearThrough[_webindex][_simhash] = true;
+    //    return true;
+    //}
 
 }
