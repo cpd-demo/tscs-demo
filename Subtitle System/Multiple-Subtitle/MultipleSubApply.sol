@@ -9,7 +9,7 @@ import "./ERC721/IERC721Receiver.sol";
 interface FlowOracleInterface {
     function ifWhiteListUsr(address usr) external view returns(bool);
     function ifVideoOwner(uint webindex,address usr) external view returns(bool);
-    function confirmThrough(uint _webindex,string memory _simhash)external returns(bool);
+    //function confirmThrough(uint _webindex,string memory _simhash)external returns(bool);
 }
 
 contract config  {
@@ -282,7 +282,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
     
     function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash) public  returns(uint){
         require(videos[_webindex].Applys[_language].IfSucess == false);
-        require(Oracle.confirmThrough(_webindex,_subtitlehash));
+        //require(Oracle.confirmThrough(_webindex,_subtitlehash));
         require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
         require(keccak256(abi.encodePacked(videos[_webindex].VideoName)) == keccak256(abi.encodePacked(_videoname)) && keccak256(abi.encodePacked(videos[_webindex].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
         if(User[msg.sender].ifcreate == false) {
