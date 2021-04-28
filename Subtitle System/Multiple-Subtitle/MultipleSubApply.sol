@@ -28,8 +28,10 @@ contract config  {
     event Approval(address indexed _owner,address indexed _approved,uint indexed _tokenId);
     event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
     string[] PayType;//所有支付类型.
+    //address[] Arbiter;
     
     constructor() {
+        
         //CEO可以设置支付类型
         CEO = msg.sender;
         PayType.push("0:Share payment.");
@@ -97,6 +99,7 @@ contract config  {
     mapping(address => mapping(uint => mapping(string => bool))) onlyvoteone;//限制对某个视频只能投一个字幕.
     mapping(uint => mapping(string => bool)) ifapply;//判断webindex该视频号是否已经申请过这种语言.
     mapping(address => mapping(address => bool)) ownerToOperators;
+    //mapping(address => bool) administrators;
     
     //用户结构未设置 ，可以设置升级功能，即用户上传一定字幕并通过后提升等级，并可获得一定特权.
     modifier onlyCEO() {
@@ -222,14 +225,22 @@ contract Subtitle_ERC721 is config{
 }
 
 contract Subtitle_Function is Subtitle_ERC721 {
-    constructor(address _oracleaddr) {
+    constructor(address _oracleaddr) {//address[] memory arbiter
         Oracle = FlowOracleInterface(_oracleaddr); 
+        //Arbiter = arbiter;
+        //for (uint i = 0; i < Arbiter.length; i++) {
+        //    administrators[Arbiter[i]] = true;
+        //}
     }
     FlowOracleInterface Oracle;
     modifier onlyWhiteListUsr(address _usr) {
         require(Oracle.ifWhiteListUsr(_usr));
         _;
     }
+    //modifier ifAdministrators(address _usr) {
+    //    require(_usr == CEO || administrators[_usr] == true);
+    //    _;
+    //}
     function VideoApply (uint _webindex,string memory _videoname,string memory _videosource,string memory _language,uint _paytype,uint _paynumber) public returns(uint){
         require(ifapply[_webindex][_language] == false);
         require(Oracle.ifVideoOwner(_webindex,msg.sender));
@@ -315,6 +326,10 @@ contract Subtitle_Function is Subtitle_ERC721 {
         PayType.push(_newpaytype);
 
     }
+    //function editUsrInfo(address _usr,uint _newcredpoints)public ifAdministrators(msg.sender) returns(bool) {
+    //    User[_usr].creditpoints = _newcredpoints;
+    //    return true;
+    //}
     //只有视频作者或者字幕作者可以查看该字幕信息，方便两者随时查看信息以便修改或其它操作.
     function SubtitleInfo(uint _subtitleindex) public view returns(uint,address,string memory,bool,uint,uint) {
         require(msg.sender == subtitles[_subtitleindex].subtitleowner || msg.sender == videos[subtitles[_subtitleindex].webindex].VideoOwner);
@@ -512,6 +527,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
             uint len = subtitles[index].stepaddress.length;
             for (uint i=0;i<len;i++){
                 stepaddress[i] = subtitles[index].stepaddress[i];
+                User[stepaddress[i]].creditpoints += 1;
             }
             emit DeleteSub(_webindex, index, subtitles[index].ipfsaddress, subtitles[index].subtitlehash,stepaddress);
             delete subtitles[index];//并且删除该字幕，所有成员变量设为初值.
