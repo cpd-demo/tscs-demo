@@ -6,6 +6,9 @@ import "./ERC721/Address.sol";
 import "./ERC721/ERC165.sol";
 import "./ERC721/IERC721Receiver.sol";
 
+interface RewardInterface{
+    function buyInfo(uint _STindex,address _buyer)external view returns(bool);
+}
 interface FlowOracleInterface {
     function ifWhiteListUsr(address usr) external view returns(bool);
     function ifVideoOwner(uint webindex,address usr) external view returns(bool);
@@ -32,7 +35,6 @@ contract config  {
     //address[] Arbiter;
     
     constructor() {
-        
         //CEO可以设置支付类型
         CEO = msg.sender;
         PayType.push("0:Share payment.");
@@ -81,6 +83,7 @@ contract config  {
         string ipfsaddress;//如何防止用户在本地删除字幕文件，视频作者主动存储（去中心化）或者视频网站自动下载备份（中心化）.
         string subtitlehash;
         
+        uint price;
         uint top;
         address[] topaddress;//若被采用，对这部分用户进行分成奖励，其若也支持交易，很麻烦，（需要设置用户结构）.
         uint step;
@@ -218,7 +221,8 @@ contract Subtitle_ERC721 is config{
         require(_owner != address(0));
     }
     //思想是用来给想要购买该字幕Token的人来使用.
-    function getTokenInfo(uint _subtitleindex) public view returns(uint,address,string memory,uint,uint,bool){
+    function getTokenInfo(uint _webindex,string memory _language,uint _index) public view returns(uint,address,string memory,uint,uint,bool){
+        uint _subtitleindex = videos[_webindex].Applys[_language].VideoSubtitles[_index];
          //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
         require((videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == false && subtitles[_subtitleindex].iftaking == false) || (videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == true && subtitles[_subtitleindex].iftaking == true));
         return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
@@ -226,14 +230,16 @@ contract Subtitle_ERC721 is config{
 }
 
 contract Subtitle_Function is Subtitle_ERC721 {
-    constructor(address _oracleaddr) {//address[] memory arbiter
+    constructor(address _oracleaddr,address _rewardaddr) {//address[] memory arbiter
         Oracle = FlowOracleInterface(_oracleaddr); 
+        Reward = RewardInterface(_rewardaddr);
         //Arbiter = arbiter;
         //for (uint i = 0; i < Arbiter.length; i++) {
         //    administrators[Arbiter[i]] = true;
         //}
     }
     FlowOracleInterface Oracle;
+    RewardInterface Reward;
     modifier onlyWhiteListUsr(address _usr) {
         require(Oracle.ifWhiteListUsr(_usr));
         _;
@@ -280,7 +286,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         
     }
     
-    function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash) public  returns(uint){
+    function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash,uint _price) public  returns(uint){
         require(videos[_webindex].Applys[_language].IfSucess == false);
         //require(Oracle.confirmThrough(_webindex,_subtitlehash));
         require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
@@ -300,7 +306,8 @@ contract Subtitle_Function is Subtitle_ERC721 {
         subtitles[submitSubNumber].language = _language;
         subtitles[submitSubNumber].ipfsaddress = _ipfsaddress;
         subtitles[submitSubNumber].subtitlehash = _subtitlehash;
-        subtitles[submitSubNumber].iftaking = false;    
+        subtitles[submitSubNumber].iftaking = false;
+        subtitles[submitSubNumber].price = _price;
         subtitles[submitSubNumber].subtitleindex = submitSubNumber;
         videos[_webindex].Applys[_language].VideoSubtitles.push(submitSubNumber);//引用传递.
         usersubmits[msg.sender]++;
@@ -322,6 +329,16 @@ contract Subtitle_Function is Subtitle_ERC721 {
         subtitles[_subtitleindex].language = _langugae;
         subtitles[_subtitleindex].ipfsaddress = _ipfsaddress;
         subtitles[_subtitleindex].subtitlehash = _subtitlehash;
+    }
+    //完成ST的结算.
+    function closeDeal(uint _STindex)public returns(bool) {
+        bool result;
+        (result) = Reward.buyInfo(_STindex,msg.sender);
+        if(result == true){
+            _transfer(msg.sender,_STindex);
+            return true;
+        }
+        return false;
     }
     //添加支付类型
     function addPayType(string memory _newpaytype) public onlyCEO {
@@ -393,6 +410,10 @@ contract Subtitle_Function is Subtitle_ERC721 {
             _fbaddress[addid] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[videos[_webindex].Applys[_language].SuccessSubId]].topaddress[addid];
         }
         return (videos[_webindex].Applys[_language].PayType,videos[_webindex].Applys[_language].PayNumber,videos[_webindex].Applys[_language].SubOwner,_fbaddress);
+    }
+    //为支付智能合约返回ST售价和字幕拥有者地址.
+    function returnSTPrice(uint _subtitleindex) external view returns(uint,address) {
+        return (subtitles[_subtitleindex].price,subtitles[_subtitleindex].subtitleowner);
     }
     //服务于为外部视频平台的接口.
     //用于外部视频平台获取该视频所有上传字幕.
