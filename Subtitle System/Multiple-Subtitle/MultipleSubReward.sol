@@ -11,6 +11,7 @@ interface SubtitleApplyInterface {
     function getLanguage(uint _webindex)external view returns(uint,string[] memory);
     function checkApplyLa(uint _webindex,string memory _language)external view returns(bool);
     function returnRewardInfo(uint _webindex,string memory _language)external view returns(uint,uint,address,address[] memory);
+    function returnSTPrice(uint _subtitleindex) external view returns(uint,address);
 }
 contract VideoToken is ERC777 {
     address CEO;
@@ -50,9 +51,27 @@ contract VideoToken is ERC777 {
         uint surplus;
     }
     mapping(uint => VideoRecord) videosReward;
-    
-    
-    
+   
+   //ST购买相关.
+   //给字幕通证智能合约返回ST支付结果.
+   function buyInfo(uint _STindex,address _buyer)external view returns(bool) {
+       return sellST[_STindex][_buyer];
+   }
+   //通过VT来购买ST.
+   function buyST(uint _STindex)public returns(bool){
+        uint price;
+        address STowner;
+        (price,STowner) = SubtitleApply.returnSTPrice(_STindex);
+        if(price > 0) {
+           bool result = transfer(STowner,price);
+           if(result == true) {
+               sellST[_STindex][msg.sender] = true;
+               return true;
+           }
+        }
+        return false;
+    }
+    //收益结算
     function getReward(uint _webindex) public {
     require(block.timestamp >= videosReward[_webindex].lastgettime + interval); 
         uint newvideoflow;
