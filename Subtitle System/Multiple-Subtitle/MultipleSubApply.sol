@@ -7,7 +7,8 @@ import "./ERC721/ERC165.sol";
 import "./ERC721/IERC721Receiver.sol";
 
 interface RewardInterface{
-    function buyInfo(uint _STindex,address _buyer)external view returns(bool);
+    function buyInfo(uint _STindex)external view returns(bool,address);
+    function resetBuyInfo(uint _STindex)external;
 }
 interface FlowOracleInterface {
     function ifWhiteListUsr(address usr) external view returns(bool);
@@ -139,6 +140,7 @@ contract config  {
         usersubmits[_to]++;
         usersubmits[_from]--;
         subtitles[_tokenId].subtitleowner = _to;
+        subtitles[_tokenId].price = 0;
         //当用户在结算日前进行字幕交易时，一部分损失将有_from承担.
         if (subtitles[_tokenId].iftaking == true) {
             subvideos[subtitles[_tokenId].subvideoindex].SubOwner = _to;
@@ -330,17 +332,28 @@ contract Subtitle_Function is Subtitle_ERC721 {
         subtitles[_subtitleindex].ipfsaddress = _ipfsaddress;
         subtitles[_subtitleindex].subtitlehash = _subtitlehash;
     }
-    //完成ST的结算.
+    //ST的交易相关.
+    //获取ST详细信息.
+    function getTokenInfo(uint _webindex,string memory _language,uint _index) public view returns(bool,uint,address,string memory,uint,uint,uint,bool,bool){
+        uint _subtitleindex = videos[_webindex].Applys[_language].VideoSubtitles[_index];
+        bool result;
+        (result,)= Reward.buyInfo(_subtitleindex);
+         //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
+        return (result,subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].price,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess,subtitles[_subtitleindex].iftaking);
+    } 
+    //完成ST最终结算.
     function closeDeal(uint _STindex)public returns(bool) {
         bool result;
-        (result) = Reward.buyInfo(_STindex,msg.sender);
-        if(result == true){
+        address STbuyer;
+        (result,STbuyer) = Reward.buyInfo(_STindex);
+        if(result == true && STbuyer == msg.sender){
             _transfer(msg.sender,_STindex);
+            Reward.resetBuyInfo(_STindex);
             return true;
         }
         return false;
     }
-    //添加支付类型
+    //添加支付类型，目前没有实际用处.
     function addPayType(string memory _newpaytype) public onlyCEO {
         PayType.push(_newpaytype);
 
