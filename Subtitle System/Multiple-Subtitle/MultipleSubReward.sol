@@ -16,6 +16,7 @@ interface SubtitleApplyInterface {
 contract VideoToken is ERC777 {
     address CEO;
     address Wallet;
+    address subtitleapplyaddr;
     uint videoproportion;
     uint fbproportion;
     uint interval;
@@ -31,6 +32,7 @@ contract VideoToken is ERC777 {
           interval = _interval;
           FlowOracle = FlowOracleInterface(_oracleaddress);
           SubtitleApply = SubtitleApplyInterface(_subtitleaddress);
+          subtitleapplyaddr = _subtitleaddress;
     }
 
     FlowOracleInterface FlowOracle;
@@ -53,23 +55,32 @@ contract VideoToken is ERC777 {
     mapping(uint => VideoRecord) videosReward;
    
    //ST购买相关.
-   //给字幕通证智能合约返回ST支付结果.
-   function buyInfo(uint _STindex,address _buyer)external view returns(bool) {
-       return sellST[_STindex][_buyer];
+   //返回ST是否售卖信息.
+   function buyInfo(uint _STindex)external view returns(bool,address) {
+       return (sell[_STindex],sellST[_STindex]);
    }
-   //通过VT来购买ST.
+   //ST购买功能.
    function buyST(uint _STindex)public returns(bool){
+        require(sell[_STindex] == false);
         uint price;
         address STowner;
         (price,STowner) = SubtitleApply.returnSTPrice(_STindex);
         if(price > 0) {
            bool result = transfer(STowner,price);
            if(result == true) {
-               sellST[_STindex][msg.sender] = true;
+               sellST[_STindex] = msg.sender;
+               sell[_STindex] = true;
+               emit buySTsucess(_STindex,STowner,msg.sender);
                return true;
            }
         }
         return false;
+    }
+    //重置ST售卖信息，防止重复售卖/给与购买者售卖权.
+    function resetBuyInfo(uint _STindex)external {
+        require(msg.sender == subtitleapplyaddr);
+        sell[_STindex] = false;
+        sellST[_STindex] = address(0);
     }
     //收益结算
     function getReward(uint _webindex) public {
