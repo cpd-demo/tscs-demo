@@ -33,7 +33,7 @@ contract config  {
     event Approval(address indexed _owner,address indexed _approved,uint indexed _tokenId);
     event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
     string[] PayType;//所有支付类型.
-    //address[] Arbiter;
+    //address[] Arbiter;//administrators
     
     constructor() {
         //CEO可以设置支付类型
