@@ -221,11 +221,11 @@ contract Subtitle_ERC721 is config{
         require(_owner != address(0));
     }
     //思想是用来给想要购买该字幕Token的人来使用.
-    function getTokenInfo(uint _webindex,string memory _language,uint _index) public view returns(uint,address,string memory,uint,uint,uint,bool){
+    function getTokenInfo(uint _webindex,string memory _language,uint _index) public view returns(uint,uint,address,string memory,uint,uint,uint,bool){
         uint _subtitleindex = videos[_webindex].Applys[_language].VideoSubtitles[_index];
          //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
         require((videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == false && subtitles[_subtitleindex].iftaking == false) || (videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess == true && subtitles[_subtitleindex].iftaking == true));
-        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].price,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
+        return (subtitles[_subtitleindex].webindex,_subtitleindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].price,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,subtitles[_subtitleindex].iftaking);
     } 
 }
 
