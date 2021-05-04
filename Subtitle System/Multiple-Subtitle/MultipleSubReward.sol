@@ -21,8 +21,12 @@ contract VideoToken is ERC777 {
     uint fbproportion;
     uint interval;
     uint totalpaytoken;
+    mapping(uint => VideoRecord) videosReward;
+    mapping(uint => bool) sell;
+    mapping(uint => address) sellST;
     event videoTokenReceived(address videowner,uint number);
     event subTokenReceived(address videowner,uint number,uint fbnumber);
+    event buySTsucess(uint STindex,address STowner,address STnewowner);
     constructor(address[] memory defaultOperators,address payable wallet,uint initialSupply,uint _interval,uint _videoproportion,uint _fbproportion,address _oracleaddress,address _subtitleaddress) ERC777("VideoToken", "VT", defaultOperators,wallet,initialSupply)
     {   
           Wallet = wallet;
@@ -38,7 +42,6 @@ contract VideoToken is ERC777 {
     FlowOracleInterface FlowOracle;
     SubtitleApplyInterface SubtitleApply;
     struct VideoRecord {
-        bool create;
         uint lastflow;
         uint lastgettime;
         uint lastgettoken;
@@ -52,7 +55,6 @@ contract VideoToken is ERC777 {
         bool create;
         uint surplus;
     }
-    mapping(uint => VideoRecord) videosReward;
    
    //ST购买相关.
    //返回ST是否售卖信息.
