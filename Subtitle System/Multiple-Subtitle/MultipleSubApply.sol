@@ -226,13 +226,16 @@ contract Subtitle_ERC721 is config{
 }
 
 contract Subtitle_Function is Subtitle_ERC721 {
-    constructor(address _oracleaddr,address _rewardaddr) {//address[] memory arbiter
+    constructor(address _oracleaddr) {//address[] memory arbiter
         Oracle = FlowOracleInterface(_oracleaddr); 
-        Reward = RewardInterface(_rewardaddr);
         //Arbiter = arbiter;
         //for (uint i = 0; i < Arbiter.length; i++) {
         //    administrators[Arbiter[i]] = true;
         //}
+    }
+    function rewardContract(address _rewardaddr)external onlyCEO() returns(bool) {
+        Reward = RewardInterface(_rewardaddr);
+        return true;
     }
     FlowOracleInterface Oracle;
     RewardInterface Reward;
