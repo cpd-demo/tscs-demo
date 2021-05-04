@@ -527,7 +527,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
             for (uint i=0;i<len;i++) {
                 sumtop +=  subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].top;
             }
-            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {//方便测试，设置为50秒，正式使用为2days.
+            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate >= 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {//方便测试，设置为50秒，正式使用为2days.
                 videos[_webindex].Applys[_language].IfSucess = true;
                 videos[_webindex].Applys[_language].SucSubaddress = subtitles[index].ipfsaddress;
                 videos[_webindex].Applys[_language].SuccessSubId = _subtitleindex;
@@ -557,7 +557,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         subtitles[index].step++;
         subtitles[index].stepaddress.push(msg.sender);
         userforsubvote[msg.sender][index] = true;
-        if(subtitles[index].step >= 10*subtitles[index].top || (subtitles[index].top == 0 && subtitles[index].step > 10)){
+        if(subtitles[index].step > 10*subtitles[index].top || (subtitles[index].top == 0 && subtitles[index].step > 10)){
             User[subtitles[index].subtitleowner].creditpoints -= 5;//惩罚积分减5.
             address[] memory stepaddress;
             uint len = subtitles[index].stepaddress.length;
