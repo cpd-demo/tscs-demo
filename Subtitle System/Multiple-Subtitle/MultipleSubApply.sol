@@ -322,9 +322,10 @@ contract Subtitle_Function is Subtitle_ERC721 {
         videos[_webindex].Applys[_language].PayNumber = _paynumber;
     }
     
-    function editSubtitleInfo (uint _subtitleindex,string memory _langugae,string memory _ipfsaddress,string memory _subtitlehash)public canOperate(_subtitleindex) {
+    function editSubtitleInfo (uint _subtitleindex,string memory _langugae,uint _price,string memory _ipfsaddress,string memory _subtitlehash)public canOperate(_subtitleindex) {
         require(subtitles[_subtitleindex].iftaking == false);
         subtitles[_subtitleindex].lastupdated = block.timestamp;
+        subtitles[_subtitleindex].price = _price;
         subtitles[_subtitleindex].language = _langugae;
         subtitles[_subtitleindex].ipfsaddress = _ipfsaddress;
         subtitles[_subtitleindex].subtitlehash = _subtitlehash;
