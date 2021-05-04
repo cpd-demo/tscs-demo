@@ -287,15 +287,15 @@ contract Subtitle_Function is Subtitle_ERC721 {
     
     function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash,uint _price) public  returns(uint){
         require(videos[_webindex].Applys[_language].IfSucess == false);
-        //require(Oracle.confirmThrough(_webindex,_subtitlehash));
-        require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
-        require(keccak256(abi.encodePacked(videos[_webindex].VideoName)) == keccak256(abi.encodePacked(_videoname)) && keccak256(abi.encodePacked(videos[_webindex].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applypoints = 100;
             User[msg.sender].submitpoints = 100;
             User[msg.sender].creditpoints = 100;
             User[msg.sender].ifcreate = true;
         }
+        //require(Oracle.confirmThrough(_webindex,_subtitlehash));
+        require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
+        require(keccak256(abi.encodePacked(videos[_webindex].VideoName)) == keccak256(abi.encodePacked(_videoname)) && keccak256(abi.encodePacked(videos[_webindex].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
         submitSubNumber++;
         videos[_webindex].Applys[_language].SubtitleNums++;
         subtitles[submitSubNumber].videoname = _videoname;
