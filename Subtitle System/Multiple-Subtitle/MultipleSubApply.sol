@@ -527,7 +527,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
             for (uint i=0;i<len;i++) {
                 sumtop +=  subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].top;
             }
-            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {
+            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate > 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {//方便测试，设置为50秒，正式使用为2days.
                 videos[_webindex].Applys[_language].IfSucess = true;
                 videos[_webindex].Applys[_language].SucSubaddress = subtitles[index].ipfsaddress;
                 videos[_webindex].Applys[_language].SuccessSubId = _subtitleindex;
