@@ -360,10 +360,10 @@ contract Subtitle_Function is Subtitle_ERC721 {
     //    User[_usr].creditpoints = _newcredpoints;
     //    return true;
     //}
-    //只有视频作者或者字幕作者可以查看该字幕信息，方便两者随时查看信息以便修改或其它操作.
-    function SubtitleInfo(uint _subtitleindex) public view returns(uint,address,string memory,bool,uint,uint) {
-        require(msg.sender == subtitles[_subtitleindex].subtitleowner || msg.sender == videos[subtitles[_subtitleindex].webindex].VideoOwner);
-        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].iftaking,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber);
+    //只有管理员或者字幕作者可以查看该字幕地址信息.
+    function SubtitleInfo(uint _subtitleindex) public view returns(uint,address,string memory,bool,string memory,string memory) {
+        require(msg.sender == subtitles[_subtitleindex].subtitleowner || msg.sender == CEO || administrators[msg.sender] == true);
+        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].iftaking,subtitles[_subtitleindex].ipfsaddress,subtitles[_subtitleindex].subtitlehash);
     }
     //提供给字幕工作者的功能.
     //将未采用字幕的视频且符合输入语言的视频号输出，用于字幕提供者查询.
