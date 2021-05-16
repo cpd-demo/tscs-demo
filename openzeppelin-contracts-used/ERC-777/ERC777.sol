@@ -67,7 +67,7 @@ contract ERC777 is Context, IERC777, IERC20 {
         _name = name_;
         _symbol = symbol_;
         defaultwallet = wallet_;
-        _mint(defaultwallet,(initialSupply*10**18),"","");
+        _mint(defaultwallet,(initialSupply*10**decimals()),"","");
         _defaultOperatorsArray = defaultOperators_;
         for (uint256 i = 0; i < defaultOperators_.length; i++) {
             _defaultOperators[defaultOperators_[i]] = true;
