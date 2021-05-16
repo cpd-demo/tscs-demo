@@ -98,6 +98,7 @@ contract VideoToken is ERC777 {
             videosReward[_webindex].totalgettoken += gettoken;
             emit videoTokenReceived(videowner, gettoken);
         }else {
+           totalpaytoken = 0; 
            supportGet(_webindex,totalvideotokens);
         }
         if (totalvideotokens > totalpaytoken) {
