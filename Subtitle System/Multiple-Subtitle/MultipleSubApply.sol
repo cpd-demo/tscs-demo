@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SimPL-2.0
-pragma solidity >= 0.4.25 < 0.8.5;
+pragma solidity >= 0.8.0 < 0.9.0;
 pragma experimental ABIEncoderV2;
 
 import "./ERC721/Address.sol";
@@ -13,7 +13,7 @@ interface RewardInterface{
 interface FlowOracleInterface {
     function ifWhiteListUsr(address usr) external view returns(bool);
     function ifVideoOwner(uint webindex,address usr) external view returns(bool);
-    //function confirmThrough(uint _webindex,string memory _simhash)external returns(bool);
+    //function confirmThrough(uint video_index,string memory _simhash)external returns(bool);
 }
 
 contract config  {
@@ -23,17 +23,17 @@ contract config  {
     uint applyVideosNumber;
     uint applyNumber;
     uint submitSubNumber;
-    event applysubtitle(address owner,uint videoindex,string videoname,string language,uint paytype,uint paynumber);
-    event subtitlesubmit(uint videoindex,string videoname,string language);
-    event confirm(uint webidnex,string videoname,string language,uint subindex);
-    event DeleteSub(uint _webindex,uint index, string _ipfsaddress, string _subtitlehash,address[] _stepaddress);
-    event DeleteSubByOwner(uint _webindex,uint index, string _ipfsaddress, string _subtitlehash);
+    event applysubtitle(uint apply_index,address video_owner,uint video_index,string vide_oname,string _language,uint pay_type,uint pay_number);
+    event subtitlesubmit(uint subtitle_index,uint video_index,string vide_oname,string _language);
+    event confirm(uint video_index,string video_name,string _language,uint subtitle_index);
+    event DeleteSub(uint video_index,uint _index, string ipfs_address, string _subtitle_hash,address[] step_address);
+    event DeleteSubByOwner(uint video_index,uint _index, string ipfs_address, string subtitle_hash);
     //ERC-721事件.
     event Transfer(address indexed _from,address indexed _to,uint indexed _tokenId);
     event Approval(address indexed _owner,address indexed _approved,uint indexed _tokenId);
     event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
     string[] PayType;//所有支付类型.
-    //address[] Arbiter;//administrators
+    address[] Arbiter;
     
     constructor() {
         //CEO可以设置支付类型
@@ -44,18 +44,18 @@ contract config  {
     //当用户进行申请和上传操作时才会创建此结构.
     struct Usr {
         bool ifcreate;
-        uint applypoints;
-        uint submitpoints;
-        uint creditpoints;
+        uint applyPoints;
+        uint submitPoints;
+        uint creditPoints;
     }
     //字幕和视频结构 .
     struct Video {
         uint WebIndex;
-        uint ApplyNums;
+        uint Number;
         string VideoName;
         string VideoSource;
         address VideoOwner;
-        string[] ApplyLa;
+        string[] language;
         mapping(string => subVideo) Applys;    
     }
     struct subVideo{
@@ -70,25 +70,25 @@ contract config  {
         uint SuccessSubId;
         address SubOwner;
         string SucSubaddress;
-        uint SubtitleNums;
+        uint sumSubtitles;
         uint[] VideoSubtitles;//方便单个视频页面内的相关操作,在字幕被确定采纳后，实则可以清空（使用delete删除，Subtitle[] VideoSubtitles，但只是引用，我觉得没必要删除处理）.
     }
     struct Subtitle {
-        uint subtitleindex;
+        uint subtitleIndex;
         uint subvideoindex;
         string videoname;
         uint webindex;
-        address subtitleowner;
+        address subtitleOwner;
         
         string language;
-        string ipfsaddress;//如何防止用户在本地删除字幕文件，视频作者主动存储（去中心化）或者视频网站自动下载备份（中心化）.
-        string subtitlehash;
+        string subtitleIPFS;//如何防止用户在本地删除字幕文件，视频作者主动存储（去中心化）或者视频网站自动下载备份（中心化）.
+        string subtitleHash;
         
-        uint price;
-        uint top;
-        address[] topaddress;//若被采用，对这部分用户进行分成奖励，其若也支持交易，很麻烦，（需要设置用户结构）.
-        uint step;
-        address[] stepaddress;
+        uint subtitlePrice;
+        uint topSum;
+        address[] topAddress;//若被采用，对这部分用户进行分成奖励，其若也支持交易，很麻烦，（需要设置用户结构）.
+        uint stepSum;
+        address[] stepAddress;
         bool iftaking;
         uint lastupdated;
     }
@@ -104,7 +104,7 @@ contract config  {
     mapping(address => mapping(uint => mapping(string => bool))) onlyvoteone;//限制对某个视频只能投一个字幕.
     mapping(uint => mapping(string => bool)) ifapply;//判断webindex该视频号是否已经申请过这种语言.
     mapping(address => mapping(address => bool)) ownerToOperators;
-    //mapping(address => bool) administrators;
+    mapping(address => bool) administrators;
     
     //用户结构未设置 ，可以设置升级功能，即用户上传一定字幕并通过后提升等级，并可获得一定特权.
     modifier onlyCEO() {
@@ -112,35 +112,35 @@ contract config  {
         _;
     }
     //防止恶意字幕上传，视频作者可将恶意字幕置空，逻辑上考虑作者恶意行为的可能性，发了钱发布是为了获得字幕，如果真的没问题不会恶意删除，另外对某人字幕不采用或指定某人字幕的可能性都很低.
-    modifier onlyvideoowner (uint _webindex,string memory _applylanguage) {
-        require(videos[_webindex].VideoOwner == msg.sender);
-        require(videos[_webindex].Applys[_applylanguage].IfSucess == false);
+    modifier onlyvideoowner (uint video_index,string memory _applylanguage) {
+        require(videos[video_index].VideoOwner == msg.sender);
+        require(videos[video_index].Applys[_applylanguage].IfSucess == false);
         _;
     }
     //ERC-721标准修改器.
     modifier canOperate(uint _subtitleindex) {
-        address tokenowner = subtitles[_subtitleindex].subtitleowner;
+        address tokenowner = subtitles[_subtitleindex].subtitleOwner;
         require(tokenowner == msg.sender || ownerToOperators[tokenowner][msg.sender]);
         _;
     }
     modifier canTransfer(uint _subtitleindex) {
-        address subtitleowner = subtitles[_subtitleindex].subtitleowner;
-        require(subtitleowner == msg.sender ||  subtitleToApproved[_subtitleindex] == msg.sender || ownerToOperators[subtitleowner][msg.sender] == true);
+        address subtitleOwner = subtitles[_subtitleindex].subtitleOwner;
+        require(subtitleOwner == msg.sender ||  subtitleToApproved[_subtitleindex] == msg.sender || ownerToOperators[subtitleOwner][msg.sender] == true);
         _;
     }
     modifier validNFToken(uint _subtitleindex) {
-        require(subtitles[_subtitleindex].subtitleowner != address(0));
+        require(subtitles[_subtitleindex].subtitleOwner != address(0));
         _;
     }
 
     //交易功能
     function _transfer(address _to, uint256 _tokenId) internal {
         require(_to != address(0));
-        address _from = subtitles[_tokenId].subtitleowner;
+        address _from = subtitles[_tokenId].subtitleOwner;
         usersubmits[_to]++;
         usersubmits[_from]--;
-        subtitles[_tokenId].subtitleowner = _to;
-        subtitles[_tokenId].price = 0;
+        subtitles[_tokenId].subtitleOwner = _to;
+        subtitles[_tokenId].subtitlePrice = 0;
         //当用户在结算日前进行字幕交易时，一部分损失将有_from承担.
         if (subtitles[_tokenId].iftaking == true) {
             subvideos[subtitles[_tokenId].subvideoindex].SubOwner = _to;
@@ -168,7 +168,7 @@ contract config  {
         }
     }
     function _safeTransferFrom(address _from,address _to,uint _tokenId,bytes memory _data) internal canTransfer(_tokenId) validNFToken(_tokenId) {
-        address tokenowner = subtitles[_tokenId].subtitleowner;
+        address tokenowner = subtitles[_tokenId].subtitleOwner;
         require(tokenowner == _from);
         require(_to != address(0));
         _transfer(_to, _tokenId);
@@ -177,7 +177,7 @@ contract config  {
 }
 contract Subtitle_ERC721 is config{
     function approve(address _to,uint _subtitleindex)external canOperate(_subtitleindex) validNFToken(_subtitleindex) {
-        require(subtitles[_subtitleindex].subtitleowner != _to);
+        require(subtitles[_subtitleindex].subtitleOwner != _to);
         subtitleToApproved[_subtitleindex] = _to;
         emit Approval(msg.sender, _to, _subtitleindex);
     }
@@ -192,7 +192,7 @@ contract Subtitle_ERC721 is config{
         return ownerToOperators[_owner][_operator];
     }
     function transferFrom (address _from,address _to,uint _subtitleindex)external canTransfer(_subtitleindex) validNFToken(_subtitleindex){//transferSubtitle
-        address tokenowner = subtitles[_subtitleindex].subtitleowner;
+        address tokenowner = subtitles[_subtitleindex].subtitleOwner;
         require(tokenowner == _from);
         _transfer(_to,_subtitleindex);
     }
@@ -211,7 +211,7 @@ contract Subtitle_ERC721 is config{
         uint resultIndex = 0;
         uint subtitleid;
         for(subtitleid = 1;subtitleid<=totalsubtitles;subtitleid++){
-            if(subtitles[subtitleid].subtitleowner == _owner){
+            if(subtitles[subtitleid].subtitleOwner == _owner){
             result[resultIndex] = subtitleid;
             resultIndex++;
             }
@@ -219,19 +219,19 @@ contract Subtitle_ERC721 is config{
         return (subtitlecount,result);
     }
     function ownerOf(uint _subtitleindex)external view returns(address _owner) {
-        _owner = subtitles[_subtitleindex].subtitleowner;
+        _owner = subtitles[_subtitleindex].subtitleOwner;
         require(_owner != address(0));
     }
 
 }
 
 contract Subtitle_Function is Subtitle_ERC721 {
-    constructor(address _oracleaddr) {//address[] memory arbiter
+    constructor(address _oracleaddr,address[] memory arbiter) {
         Oracle = FlowOracleInterface(_oracleaddr); 
-        //Arbiter = arbiter;
-        //for (uint i = 0; i < Arbiter.length; i++) {
-        //    administrators[Arbiter[i]] = true;
-        //}
+        Arbiter = arbiter;
+        for (uint i = 0; i < Arbiter.length; i++) {
+            administrators[Arbiter[i]] = true;
+        }
     }
     function rewardContract(address _rewardaddr)external onlyCEO() returns(bool) {
         Reward = RewardInterface(_rewardaddr);
@@ -243,103 +243,100 @@ contract Subtitle_Function is Subtitle_ERC721 {
         require(Oracle.ifWhiteListUsr(_usr));
         _;
     }
-    //modifier ifAdministrators(address _usr) {
-    //    require(_usr == CEO || administrators[_usr] == true);
-    //    _;
-    //}
-    function VideoApply (uint _webindex,string memory _videoname,string memory _videosource,string memory _language,uint _paytype,uint _paynumber) public returns(uint){
-        require(ifapply[_webindex][_language] == false);
-        require(Oracle.ifVideoOwner(_webindex,msg.sender));
+    modifier ifAdministrators(address _usr) {
+        require(_usr == CEO || administrators[_usr] == true);
+        _;
+    }
+    function VideoApply (uint video_index,string memory video_name,string memory _videosource,string memory _language,uint pay_type,uint pay_number) public {
+        require(ifapply[video_index][_language] == false);
+        require(Oracle.ifVideoOwner(video_index,msg.sender));
         if(User[msg.sender].ifcreate == false) {
-            User[msg.sender].applypoints = 100;
-            User[msg.sender].submitpoints = 100;
-            User[msg.sender].creditpoints = 100;
+            User[msg.sender].applyPoints = 100;
+            User[msg.sender].submitPoints = 100;
+            User[msg.sender].creditPoints = 100;
             User[msg.sender].ifcreate = true;
         }
-        if(videocreate[_webindex] == false) {
+        if(videocreate[video_index] == false) {
             applyVideosNumber++; 
-            videos[_webindex].WebIndex = _webindex;
-            videos[_webindex].VideoName = _videoname;
-            videos[_webindex].VideoOwner = msg.sender;
-            videos[_webindex].VideoSource = _videosource;
-            videocreate[_webindex] = true;
+            videos[video_index].WebIndex = video_index;
+            videos[video_index].VideoName = video_name;
+            videos[video_index].VideoOwner = msg.sender;
+            videos[video_index].VideoSource = _videosource;
+            videocreate[video_index] = true;
         }
         applyNumber++;
-        videos[_webindex].ApplyNums++;
-        subvideos[applyNumber].WebIndex= _webindex;
+        videos[video_index].Number++;
+        subvideos[applyNumber].WebIndex= video_index;
         subvideos[applyNumber].ApplyIndex= applyNumber; 
         subvideos[applyNumber].ApplyLanguage = _language;
-        subvideos[applyNumber].PayType = _paytype;
-        subvideos[applyNumber].PayNumber = _paynumber;
+        subvideos[applyNumber].PayType = pay_type;
+        subvideos[applyNumber].PayNumber = pay_number;
         subvideos[applyNumber].ApplyTime = block.timestamp;
         subvideos[applyNumber].IfSucess = false;
      
-        videos[_webindex].Applys[_language] = subvideos[applyNumber];
+        videos[video_index].Applys[_language] = subvideos[applyNumber];
         
         userapplys[msg.sender]++;
-        User[msg.sender].applypoints += 1;
-        videos[_webindex].ApplyLa.push(_language);
-        ifapply[_webindex][_language] == true;
-        emit applysubtitle(msg.sender,_webindex,_videoname,_language,_paytype,_paynumber);
-        return applyNumber;
+        User[msg.sender].applyPoints += 1;
+        videos[video_index].language.push(_language);
+        ifapply[video_index][_language] == true;
+        emit applysubtitle(applyNumber,msg.sender,video_index,video_name,_language,pay_type,pay_number);
         
     }
     
-    function SubtitleSubmit(string memory _videoname,uint _webindex,string memory _language,string memory _ipfsaddress,string memory _subtitlehash,uint _price) public  returns(uint){
-        require(videos[_webindex].Applys[_language].IfSucess == false);
+    function SubtitleSubmit(string memory video_name,uint video_index,string memory _language,string memory _ipfsaddress,string memory _subtitlehash,uint _price) public {
+        require(videos[video_index].Applys[_language].IfSucess == false);
+        //require(Oracle.confirmThrough(video_index,_subtitlehash));
         if(User[msg.sender].ifcreate == false) {
-            User[msg.sender].applypoints = 100;
-            User[msg.sender].submitpoints = 100;
-            User[msg.sender].creditpoints = 100;
+            User[msg.sender].applyPoints = 100;
+            User[msg.sender].submitPoints = 100;
+            User[msg.sender].creditPoints = 100;
             User[msg.sender].ifcreate = true;
         }
-        //require(Oracle.confirmThrough(_webindex,_subtitlehash));
-        require(User[msg.sender].creditpoints >= 60);//对于恶意用户禁止上传.
-        require(keccak256(abi.encodePacked(videos[_webindex].VideoName)) == keccak256(abi.encodePacked(_videoname)) && keccak256(abi.encodePacked(videos[_webindex].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
+        require(User[msg.sender].creditPoints >= 60);//对于恶意用户禁止上传.
+        require(keccak256(abi.encodePacked(videos[video_index].VideoName)) == keccak256(abi.encodePacked(video_name)) && keccak256(abi.encodePacked(videos[video_index].Applys[_language].ApplyLanguage)) == keccak256(abi.encodePacked(_language))); //上传条件判断视频号、语言等是否一一对应 .
         submitSubNumber++;
-        videos[_webindex].Applys[_language].SubtitleNums++;
-        subtitles[submitSubNumber].videoname = _videoname;
-        subtitles[submitSubNumber].webindex = _webindex;
+        videos[video_index].Applys[_language].sumSubtitles++;
+        subtitles[submitSubNumber].videoname = video_name;
+        subtitles[submitSubNumber].webindex = video_index;
         subtitles[submitSubNumber].lastupdated = block.timestamp;
-        subtitles[submitSubNumber].subtitleowner = msg.sender;
+        subtitles[submitSubNumber].subtitleOwner = msg.sender;
         subtitles[submitSubNumber].language = _language;
-        subtitles[submitSubNumber].ipfsaddress = _ipfsaddress;
-        subtitles[submitSubNumber].subtitlehash = _subtitlehash;
-        subtitles[submitSubNumber].iftaking = false;
-        subtitles[submitSubNumber].price = _price;
-        subtitles[submitSubNumber].subtitleindex = submitSubNumber;
-        videos[_webindex].Applys[_language].VideoSubtitles.push(submitSubNumber);//引用传递.
+        subtitles[submitSubNumber].subtitleIPFS = _ipfsaddress;
+        subtitles[submitSubNumber].subtitleHash = _subtitlehash;
+        subtitles[submitSubNumber].iftaking = false;    
+        subtitles[submitSubNumber].subtitleIndex = submitSubNumber;
+        subtitles[submitSubNumber].subtitlePrice = _price;
+        videos[video_index].Applys[_language].VideoSubtitles.push(submitSubNumber);//引用传递.
         usersubmits[msg.sender]++;
-        User[msg.sender].submitpoints += 1;
-        emit subtitlesubmit(_webindex,_videoname,_language);
-        return submitSubNumber;
+        User[msg.sender].submitPoints += 1;
+        emit subtitlesubmit(submitSubNumber,video_index,video_name,_language);
         
     }
     //编辑功能
-    function editVideoInfo (uint _webindex,string memory _language,uint _paytype,uint _paynumber) public onlyvideoowner(_webindex,_language)  {
-        require(videos[_webindex].Applys[_language].IfSucess == false);
-        videos[_webindex].Applys[_language].PayType = _paytype;
-        videos[_webindex].Applys[_language].PayNumber = _paynumber;
+    function editVideoInfo (uint video_index,string memory _language,uint pay_type,uint pay_number) public onlyvideoowner(video_index,_language)  {
+        require(videos[video_index].Applys[_language].IfSucess == false);
+        videos[video_index].Applys[_language].PayType = pay_type;
+        videos[video_index].Applys[_language].PayNumber = pay_number;
     }
     
-    function editSubtitleInfo (uint _subtitleindex,string memory _langugae,uint _price,string memory _ipfsaddress,string memory _subtitlehash)public canOperate(_subtitleindex) {
+    function editSubtitleInfo (uint _subtitleindex,string memory _langugae,string memory _ipfsaddress,string memory _subtitlehash)public canOperate(_subtitleindex) {
         require(subtitles[_subtitleindex].iftaking == false);
         subtitles[_subtitleindex].lastupdated = block.timestamp;
-        subtitles[_subtitleindex].price = _price;
         subtitles[_subtitleindex].language = _langugae;
-        subtitles[_subtitleindex].ipfsaddress = _ipfsaddress;
-        subtitles[_subtitleindex].subtitlehash = _subtitlehash;
+        subtitles[_subtitleindex].subtitleIPFS = _ipfsaddress;
+        subtitles[_subtitleindex].subtitleHash = _subtitlehash;
     }
     //ST的交易相关.
     //获取ST详细信息.
-    function getTokenInfo(uint _webindex,string memory _language,uint _index) public view returns(bool,uint,address,string memory,uint,uint,uint,bool,bool){
-        uint _subtitleindex = videos[_webindex].Applys[_language].VideoSubtitles[_index];
+    function getTokenInfo(uint video_index,string memory _language,uint _index) public view returns(bool,uint,address,string memory,uint,uint,uint,bool,bool){
+        uint _subtitleindex = videos[video_index].Applys[_language].VideoSubtitles[_index];
         bool result;
         (result,)= Reward.buyInfo(_subtitleindex);
          //对于投资人而言，只要该视频尚未字幕，便可对其上传的字幕进行购买，因为可以通过自己的手段来让该字幕被确认，虽然我们的系统应极力抵制这种做法，但是在实际上，投资人也必将优先选择合适的（至少不会是错的很离谱的）字幕，我们设计的系统也有强调字幕的质量，但更多时候（即使质量一般）上传速度往往更重要，所以以此来换取更多的金融中的操作和活跃度是值得的。
-        return (result,subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].price,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess,subtitles[_subtitleindex].iftaking);
+        return (result,subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleOwner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].subtitlePrice,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayType,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].PayNumber,videos[subtitles[_subtitleindex].webindex].Applys[subtitles[_subtitleindex].language].IfSucess,subtitles[_subtitleindex].iftaking);
     } 
-    //完成ST最终结算.
+    
     function closeDeal(uint _STindex)public returns(bool) {
         bool result;
         address STbuyer;
@@ -351,19 +348,19 @@ contract Subtitle_Function is Subtitle_ERC721 {
         }
         return false;
     }
-    //添加支付类型，目前没有实际用处.
+    //添加支付类型
     function addPayType(string memory _newpaytype) public onlyCEO {
         PayType.push(_newpaytype);
 
     }
-    //function editUsrInfo(address _usr,uint _newcredpoints)public ifAdministrators(msg.sender) returns(bool) {
-    //    User[_usr].creditpoints = _newcredpoints;
-    //    return true;
-    //}
-    //只有管理员或者字幕作者可以查看该字幕地址信息.
+    function editUsrInfo(address _usr,uint _newcredpoints)public ifAdministrators(msg.sender) returns(bool) {
+        User[_usr].creditPoints = _newcredpoints;
+        return true;
+    }
+    //只有视频作者或者字幕作者可以查看该字幕信息，方便两者随时查看信息以便修改或其它操作.
     function SubtitleInfo(uint _subtitleindex) public view returns(uint,address,string memory,bool,string memory,string memory) {
-        require(msg.sender == subtitles[_subtitleindex].subtitleowner || msg.sender == CEO || administrators[msg.sender] == true);
-        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleowner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].iftaking,subtitles[_subtitleindex].ipfsaddress,subtitles[_subtitleindex].subtitlehash);
+        require(msg.sender == subtitles[_subtitleindex].subtitleOwner || msg.sender == CEO || administrators[msg.sender] == true);
+        return (subtitles[_subtitleindex].webindex,subtitles[_subtitleindex].subtitleOwner,subtitles[_subtitleindex].language,subtitles[_subtitleindex].iftaking,subtitles[_subtitleindex].subtitleIPFS,subtitles[_subtitleindex].subtitleHash);
     }
     //提供给字幕工作者的功能.
     //将未采用字幕的视频且符合输入语言的视频号输出，用于字幕提供者查询.
@@ -381,76 +378,75 @@ contract Subtitle_Function is Subtitle_ERC721 {
         return result;   
     }
     //用来向意图为该视频提交字幕或为视频拥有者进行相关信息查询提供的接口.
-    function getVideoInfo (uint  _webindex,string memory _language) public view returns(string memory,uint,uint) {
-        require(videos[_webindex].Applys[_language].IfSucess == false || msg.sender == videos[_webindex].VideoOwner);
-        return (videos[_webindex].VideoName,  videos[_webindex].Applys[_language].PayType, videos[_webindex].Applys[_language].PayNumber);
+    function getVideoInfo (uint  video_index,string memory _language) public view returns(string memory,uint,uint) {
+        require(videos[video_index].Applys[_language].IfSucess == false || msg.sender == videos[video_index].VideoOwner);
+        return (videos[video_index].VideoName,  videos[video_index].Applys[_language].PayType, videos[video_index].Applys[_language].PayNumber);
     }
     //外部调用接口功能,专用来服务reward合约.
     //用来查询该视频是否提交申请以及申请语种.
-    function checkApply(uint _webindex) external view returns(bool) {
-        uint len = videos[_webindex].ApplyNums;
+    function checkApply(uint video_index) external view returns(bool) {
+        uint len = videos[video_index].Number;
         if(len > 0) {
             return true;
         }else {
             return false;
         }  
     }
-    function getLanguage(uint _webindex) external view returns(uint,string[]memory) {
-        uint len = videos[_webindex].ApplyNums;
+    function getLanguage(uint video_index) external view returns(uint,string[]memory) {
+        uint len = videos[video_index].Number;
         require(len > 0);
         string[] memory result = new string[](len);
             uint resultid;
             for (resultid=0;resultid<len;resultid++){
-                result[resultid] = videos[_webindex].ApplyLa[resultid];
+                result[resultid] = videos[video_index].language[resultid];
             }
             return (len,result);
     }
     //查看该视频是否成功获得某语种的字幕.
-    function checkApplyLa(uint _webindex,string memory _language)external view returns(bool) {
+    function checkApplyLa(uint video_index,string memory _language)external view returns(bool) {
         bool ifsuccess;
-        ifsuccess = videos[_webindex].Applys[_language].IfSucess;
+        ifsuccess = videos[video_index].Applys[_language].IfSucess;
         return (ifsuccess);
     }
     //返回支付类型、支付金额、字幕作者和反馈人的地址.
-    function returnRewardInfo(uint _webindex,string memory _language)external view returns(uint,uint,address,address[] memory) {
-        require(videos[_webindex].Applys[_language].IfSucess == true);
-        uint len = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[videos[_webindex].Applys[_language].SuccessSubId]].top;
+    function returnRewardInfo(uint video_index,string memory _language)external view returns(uint,uint,address,address[] memory) {
+        require(videos[video_index].Applys[_language].IfSucess == true);
+        uint len = subtitles[videos[video_index].Applys[_language].VideoSubtitles[videos[video_index].Applys[_language].SuccessSubId]].topSum;
         address[] memory _fbaddress = new address[](len);
         uint addid;
         for (addid=0;addid<len;addid++){
-            _fbaddress[addid] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[videos[_webindex].Applys[_language].SuccessSubId]].topaddress[addid];
+            _fbaddress[addid] = subtitles[videos[video_index].Applys[_language].VideoSubtitles[videos[video_index].Applys[_language].SuccessSubId]].topAddress[addid];
         }
-        return (videos[_webindex].Applys[_language].PayType,videos[_webindex].Applys[_language].PayNumber,videos[_webindex].Applys[_language].SubOwner,_fbaddress);
+        return (videos[video_index].Applys[_language].PayType,videos[video_index].Applys[_language].PayNumber,videos[video_index].Applys[_language].SubOwner,_fbaddress);
     }
-    //为支付智能合约返回ST售价和字幕拥有者地址.
     function returnSTPrice(uint _subtitleindex) external view returns(uint,address) {
-        return (subtitles[_subtitleindex].price,subtitles[_subtitleindex].subtitleowner);
+        return (subtitles[_subtitleindex].subtitlePrice,subtitles[_subtitleindex].subtitleOwner);
     }
     //服务于为外部视频平台的接口.
     //用于外部视频平台获取该视频所有上传字幕.
-    function subtitlesOfVideo(uint _webindex,string memory _language) external view returns(string[] memory) {
-        uint subnum = videos[_webindex].Applys[_language].SubtitleNums;
+    function subtitlesOfVideo(uint video_index,string memory _language) external view returns(string[] memory) {
+        uint subnum = videos[video_index].Applys[_language].sumSubtitles;
         string[] memory result = new string[](subnum);
         uint subindex;
         for(subindex=0;subindex<subnum;subindex++){
-            result[subindex] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[subindex]].ipfsaddress;
+            result[subindex] = subtitles[videos[video_index].Applys[_language].VideoSubtitles[subindex]].subtitleIPFS;
         }
         return result;
     }
     //专用于外部视频平台获取被成功采用的字幕IPFS哈希（地址）.  
-    function Subtitleinterface(uint _webindex,string memory _language) external view returns(string memory) {
-        require(videos[_webindex].Applys[_language].IfSucess == true );
-        return videos[_webindex].Applys[_language].SucSubaddress;
+    function Subtitleinterface(uint video_index,string memory _language) external view returns(string memory) {
+        require(videos[video_index].Applys[_language].IfSucess == true );
+        return videos[video_index].Applys[_language].SucSubaddress;
     }
-    //专用于外部平台获取simhash比较.
-    function getSimhash(uint _webindex,string memory _language) external view returns(uint,string[] memory){
-        uint num = videos[_webindex].Applys[_language].SubtitleNums;
+    function getSimhash(uint video_index,string memory _language) external view returns(uint,string[] memory){
+        uint num = videos[video_index].Applys[_language].sumSubtitles;
         string[] memory simhashs = new string[](num);
         for(uint i=0;i<num;i++){
-            simhashs[i] = subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].subtitlehash;
+            simhashs[i] = subtitles[videos[video_index].Applys[_language].VideoSubtitles[i]].subtitleHash;
         }
         return (num,simhashs);
     }
+    
     //为用户提供查询系统可公开信息的功能.
     //获得系统数目信息.
     function getTotalVideos() external view returns(uint) {
@@ -489,83 +485,83 @@ contract Subtitle_Function is Subtitle_ERC721 {
     }
     //返回某用户信息，查询需要一定的条件,CEO或信誉度优秀用户.
     function checkUsrInfo(address _usr) external view returns(uint,uint,uint) {
-        require(msg.sender == CEO || User[msg.sender].creditpoints > 200);
-        return (User[_usr].applypoints,User[_usr].submitpoints,User[_usr].creditpoints);
+        require(msg.sender == CEO || User[msg.sender].creditPoints > 200);
+        return (User[_usr].applyPoints,User[_usr].submitPoints,User[_usr].creditPoints);
     }
     //字幕操作
     //视频作者有权删除（恶意）字幕.
-    function VoDecSub (uint _webindex,string memory _language,uint _subtitleindex) external onlyvideoowner(_webindex,_language) returns(bool) {
-         uint index = videos[_webindex].Applys[_language].VideoSubtitles[_subtitleindex];
+    function VoDecSub (uint video_index,string memory _language,uint _subtitleindex) external onlyvideoowner(video_index,_language) returns(bool) {
+         uint index = videos[video_index].Applys[_language].VideoSubtitles[_subtitleindex];
          require(subtitles[index].iftaking == false);
-         require(subtitles[index].webindex == _webindex);
-         emit DeleteSubByOwner(_webindex, index, subtitles[index].ipfsaddress, subtitles[index].subtitlehash);//公示以便仲裁使用.
+         require(subtitles[index].webindex == video_index);
+         emit DeleteSubByOwner(video_index, index, subtitles[index].subtitleIPFS, subtitles[index].subtitleHash);//公示以便仲裁使用.
          delete subtitles[index];
          return true;
     }
     //只能对某个视频下的其中一个字幕作出点赞操作，但可以对多个字幕进行点踩操作，另外对同一字幕只能操作（赞或踩）一次且不能修改，
-    function Top (uint _webindex,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
-        uint index = videos[_webindex].Applys[_language].VideoSubtitles[_subtitleindex];
+    function topSum (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) {
+        uint index = videos[video_index].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
-            User[msg.sender].applypoints = 100;
-            User[msg.sender].submitpoints = 100;
-            User[msg.sender].creditpoints = 100;
+            User[msg.sender].applyPoints = 100;
+            User[msg.sender].submitPoints = 100;
+            User[msg.sender].creditPoints = 100;
             User[msg.sender].ifcreate = true;
         }
-        require(User[msg.sender].creditpoints >= 60);
-        require(onlyvoteone[msg.sender][_webindex][_language] == false);//只能对视频的某一个字幕投票.
+        require(User[msg.sender].creditPoints >= 60);
+        require(onlyvoteone[msg.sender][video_index][_language] == false);//只能对视频的某一个字幕投票.
         require(userforsubvote[msg.sender][index] == false);//只能对某字幕投一次且不能更改，如何解决用户误触的问题.
-        require(videos[_webindex].Applys[_language].IfSucess == false);//如果视频已经采纳了某字幕，则停止其踩赞功能.
-        subtitles[index].top++;//videos[_videoindex].VideoSubtitles[_subtitleindex].top++
-        subtitles[index].topaddress.push(msg.sender);
-        if (subtitles[index].iftaking == false && videos[_webindex].Applys[_language].IfSucess == false) {
+        require(videos[video_index].Applys[_language].IfSucess == false);//如果视频已经采纳了某字幕，则停止其踩赞功能.
+        subtitles[index].topSum++;//videos[_videoindex].VideoSubtitles[_subtitleindex].topSum++
+        subtitles[index].topAddress.push(msg.sender);
+        if (subtitles[index].iftaking == false && videos[video_index].Applys[_language].IfSucess == false) {
             //临时字幕确定函数，确定采用该字幕后，向字幕内的topaddress[]中的地址按照先后顺序发送奖励.
-            uint rate = subtitles[index].top*100/(subtitles[index].top + subtitles[index].step);
-            uint len = videos[_webindex].Applys[_language].VideoSubtitles.length;        
+            uint rate = subtitles[index].topSum*100/(subtitles[index].topSum + subtitles[index].stepSum);
+            uint len = videos[video_index].Applys[_language].VideoSubtitles.length;        
             uint sumtop = 0;
             for (uint i=0;i<len;i++) {
-                sumtop +=  subtitles[videos[_webindex].Applys[_language].VideoSubtitles[i]].top;
+                sumtop +=  subtitles[videos[video_index].Applys[_language].VideoSubtitles[i]].topSum;
             }
-            if (((subtitles[index].top - subtitles[index].step > sumtop / len) || (len == 1 && rate >= 60))&& sumtop > 1 && block.timestamp > videos[_webindex].Applys[_language].ApplyTime + 50 seconds ) {//方便测试，设置为50秒，正式使用为2days.
-                videos[_webindex].Applys[_language].IfSucess = true;
-                videos[_webindex].Applys[_language].SucSubaddress = subtitles[index].ipfsaddress;
-                videos[_webindex].Applys[_language].SuccessSubId = _subtitleindex;
-                videos[_webindex].Applys[_language].SubOwner = subtitles[index].subtitleowner;
+            if (((subtitles[index].topSum - subtitles[index].stepSum > sumtop / len) || (len == 1 && rate >= 60))&& sumtop > 1 && block.timestamp > videos[video_index].Applys[_language].ApplyTime + 50 seconds ) {
+                videos[video_index].Applys[_language].IfSucess = true;
+                videos[video_index].Applys[_language].SucSubaddress = subtitles[index].subtitleIPFS;
+                videos[video_index].Applys[_language].SuccessSubId = _subtitleindex;
+                videos[video_index].Applys[_language].SubOwner = subtitles[index].subtitleOwner;
                 subtitles[index].iftaking = true;
-                User[subtitles[index].subtitleowner].creditpoints += 1;//只有字幕被采用时信誉度才会增加1，难度很大，减少作恶的可能性；
+                User[subtitles[index].subtitleOwner].creditPoints += 1;//只有字幕被采用时信誉度才会增加1，难度很大，减少作恶的可能性；
                 subtitles[index].lastupdated = block.timestamp;//字幕被采纳时间，视频申请结束时间.
-                emit confirm(_webindex,videos[_webindex].VideoName,_language,_subtitleindex);
+                emit confirm(video_index,videos[video_index].VideoName,_language,_subtitleindex);
             } 
         }
-        onlyvoteone[msg.sender][_webindex][_language] = true;
+        onlyvoteone[msg.sender][video_index][_language] = true;
         userforsubvote[msg.sender][index] = true;
-        return true;
     }
     //当踩的数目达到一定比例，应将恶意字幕删除（置空）,同时给予上传者积分减去惩罚.
-    function Step (uint _webindex,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
-        uint index = videos[_webindex].Applys[_language].VideoSubtitles[_subtitleindex];
+    function stepSum (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
+        uint index = videos[video_index].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
-            User[msg.sender].applypoints = 100;
-            User[msg.sender].submitpoints = 100;
-            User[msg.sender].creditpoints = 100;
+            User[msg.sender].applyPoints = 100;
+            User[msg.sender].submitPoints = 100;
+            User[msg.sender].creditPoints = 100;
             User[msg.sender].ifcreate = true;
         }
-        require(User[msg.sender].creditpoints >= 60);
+        require(User[msg.sender].creditPoints >= 60);
         require(userforsubvote[msg.sender][index] == false);
-        require(videos[_webindex].Applys[_language].IfSucess == false);
-        subtitles[index].step++;
-        subtitles[index].stepaddress.push(msg.sender);
+        require(videos[video_index].Applys[_language].IfSucess == false);
+        subtitles[index].stepSum++;
+        subtitles[index].stepAddress.push(msg.sender);
         userforsubvote[msg.sender][index] = true;
-        if(subtitles[index].step > 10*subtitles[index].top || (subtitles[index].top == 0 && subtitles[index].step > 10)){
-            User[subtitles[index].subtitleowner].creditpoints -= 5;//惩罚积分减5.
-            address[] memory stepaddress;
-            uint len = subtitles[index].stepaddress.length;
+        if(subtitles[index].stepSum > 10*subtitles[index].topSum || (subtitles[index].topSum == 0 && subtitles[index].stepSum > 10)){
+            User[subtitles[index].subtitleOwner].creditPoints -= 5;//惩罚积分减5.
+            address[] memory stepAddress;
+            uint len = subtitles[index].stepAddress.length;
             for (uint i=0;i<len;i++){
-                stepaddress[i] = subtitles[index].stepaddress[i];
-                User[stepaddress[i]].creditpoints += 1;
+                stepAddress[i] = subtitles[index].stepAddress[i];
+                User[stepAddress[i]].creditPoints += 1;
             }
-            emit DeleteSub(_webindex, index, subtitles[index].ipfsaddress, subtitles[index].subtitlehash,stepaddress);
+            emit DeleteSub(video_index, index, subtitles[index].subtitleIPFS, subtitles[index].subtitleHash,stepAddress);
             delete subtitles[index];//并且删除该字幕，所有成员变量设为初值.
         }
         return true;
     }
 }
+
