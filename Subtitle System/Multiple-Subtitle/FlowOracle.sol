@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SimPL-2.0
-pragma solidity >= 0.4.25 < 0.8.5;
+pragma solidity >= 0.8.0 < 0.9.0;
 
 contract FlowOracle {
     address public oracleAddress;
@@ -23,50 +23,50 @@ contract FlowOracle {
         uint lastupdate;
         uint lastflow;
         uint newflow;
-        mapping(string => SubInfo) Subs;
+        mapping(string => SubtitleInfo) langToSub;
     }
-    struct SubInfo{
+    struct SubtitleInfo{
         uint sublastflow;
         uint subnewflow;
     }
     mapping(uint => VideoInfo) Videos;
-    //mapping(uint => mapping(string => bool)) clearThrough;
-    event FlowUpdate(string videoname,string videosource,uint webindex,uint newupdate,uint flow);
+    event FlowUpdate(string video_name,string video_source,uint video_index,uint new_update,uint _flow);
     uint WhitelistNumber;
     mapping(address => bool) Whitelist;
-    event addWhiteList(address usr,uint index);
+    mapping(uint => mapping(string => bool)) clearThrough;
+    event addWhiteList(address _usr,uint _index);
     function updateOracle(address _neworacleaddress) public view{
         require(msg.sender == CEO);
         oracleAddress == _neworacleaddress;
     }
-    function createInfo(uint _webindex,string memory _videoname,string memory _videosource,address _videowner) external onlyoracleAddress{
-        require(Videos[_webindex].ifcreate == false);
-        Videos[_webindex].ifcreate = true;
-        Videos[_webindex].videoname = _videoname;
-        Videos[_webindex].videosource = _videosource;
-        Videos[_webindex].videowner = _videowner;
-        Whitelist[_videowner] = true;
+    function createInfo(uint video_index,string memory video_name,string memory video_source,address video_owner) external onlyoracleAddress{
+        require(Videos[video_index].ifcreate == false);
+        Videos[video_index].ifcreate = true;
+        Videos[video_index].videoname = video_name;
+        Videos[video_index].videosource = video_source;
+        Videos[video_index].videowner = video_owner;
+        Whitelist[video_owner] = true;
     }
-    function updateFlow (uint _webindex,uint _flow,string memory _language,uint _subflow) external onlyoracleAddress {
-        require(block.timestamp >= Videos[_webindex].lastupdate + updateTime);
-        require(Videos[_webindex].ifcreate == true);
-        Videos[_webindex].lastflow = Videos[_webindex].newflow;
-        Videos[_webindex].newflow = _flow;
-        Videos[_webindex].Subs[_language].sublastflow = Videos[_webindex].Subs[_language].subnewflow;
-        Videos[_webindex].Subs[_language].subnewflow = _subflow;
-        Videos[_webindex].lastupdate = block.timestamp;
-        emit FlowUpdate(Videos[_webindex].videoname,Videos[_webindex].videosource,_webindex,Videos[_webindex].lastupdate,Videos[_webindex].newflow);
+    function updateFlow (uint video_index,uint _flow,string memory _language,uint sub_flow) external onlyoracleAddress {
+        require(block.timestamp >= Videos[video_index].lastupdate + updateTime);
+        require(Videos[video_index].ifcreate == true);
+        Videos[video_index].lastflow = Videos[video_index].newflow;
+        Videos[video_index].newflow = _flow;
+        Videos[video_index].langToSub[_language].sublastflow = Videos[video_index].langToSub[_language].subnewflow;
+        Videos[video_index].langToSub[_language].subnewflow = sub_flow;
+        Videos[video_index].lastupdate = block.timestamp;
+        emit FlowUpdate(Videos[video_index].videoname,Videos[video_index].videosource,video_index,Videos[video_index].lastupdate,Videos[video_index].newflow);
     }
-    function updateSubFlow(uint _webindex,string memory _language,uint _subflow) external onlyoracleAddress {
-        require(Videos[_webindex].ifcreate == true);
-        Videos[_webindex].Subs[_language].sublastflow = Videos[_webindex].Subs[_language].subnewflow;
-        Videos[_webindex].Subs[_language].subnewflow = _subflow;
+    function updateSubFlow(uint video_index,string memory _language,uint sub_flow) external onlyoracleAddress {
+        require(Videos[video_index].ifcreate == true);
+        Videos[video_index].langToSub[_language].sublastflow = Videos[video_index].langToSub[_language].subnewflow;
+        Videos[video_index].langToSub[_language].subnewflow = sub_flow;
     }
-    function getFlow(uint _webindex) external view returns(uint,uint,address) {
-        return (Videos[_webindex].lastupdate,Videos[_webindex].newflow,Videos[_webindex].videowner);
+    function getFlow(uint video_index) external view returns(uint,uint,address) {
+        return (Videos[video_index].lastupdate,Videos[video_index].newflow,Videos[video_index].videowner);
     }
-    function getSubFlow(uint _webindex,string memory _language) external view returns(uint,uint) {
-        return (Videos[_webindex].Subs[_language].sublastflow,Videos[_webindex].Subs[_language].subnewflow);
+    function getSubFlow(uint video_index,string memory _language) external view returns(uint,uint) {
+        return (Videos[video_index].langToSub[_language].sublastflow,Videos[video_index].langToSub[_language].subnewflow);
     }
     function addWhiteListUsr(address _usr) external onlyoracleAddress returns(bool,uint) {
         Whitelist[_usr] = true;
@@ -80,9 +80,9 @@ contract FlowOracle {
         require(Videos[webindex].videowner == usr);
         return true;
     }
-    //function confirmThrough(uint _webindex,string memory _simhash)external onlyoracleAddress returns(bool){
-    //    clearThrough[_webindex][_simhash] = true;
-    //    return true;
-    //}
+    /*function confirmThrough(uint video_index,string memory _simhash)external onlyoracleAddress returns(bool){
+        clearThrough[video_index][_simhash] = true;
+        return true;
+    }*/
 
 }
