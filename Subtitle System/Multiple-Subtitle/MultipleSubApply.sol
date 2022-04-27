@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: SimPL-2.0
-pragma solidity >= 0.8.0 < 0.9.0;
+pragma solidity >= 0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "./ERC721/Address.sol";
-import "./ERC721/ERC165.sol";
+import "./utils/Address.sol";
+import "./utils/ERC165.sol";
 import "./ERC721/IERC721Receiver.sol";
-
 interface RewardInterface{
     function buyInfo(uint _STindex)external view returns(bool,address);
     function resetBuyInfo(uint _STindex)external;
@@ -23,8 +22,8 @@ contract config  {
     uint applyVideosNumber;
     uint applyNumber;
     uint submitSubNumber;
-    event applysubtitle(uint apply_index,address video_owner,uint video_index,string vide_oname,string _language,uint pay_type,uint pay_number);
-    event subtitlesubmit(uint subtitle_index,uint video_index,string vide_oname,string _language);
+    event NewApply(uint apply_index,address video_owner,uint video_index,string vide_oname,string _language,uint pay_type,uint pay_number);
+    event NewSubtitling(uint subtitle_index,uint video_index,string vide_oname,string _language);
     event confirm(uint video_index,string video_name,string _language,uint subtitle_index);
     event DeleteSub(uint video_index,uint _index, string ipfs_address, string _subtitle_hash,address[] step_address);
     event DeleteSubByOwner(uint video_index,uint _index, string ipfs_address, string subtitle_hash);
@@ -175,7 +174,7 @@ contract config  {
         require(_checkOnERC721Received(_from, _to, _tokenId, _data),"ERC721: transfer to non ERC721Receiver implementer");
     }
 }
-contract Subtitle_ERC721 is config{
+contract Subtitles_ERC721 is config{
     function approve(address _to,uint _subtitleindex)external canOperate(_subtitleindex) validNFToken(_subtitleindex) {
         require(subtitles[_subtitleindex].subtitleOwner != _to);
         subtitleToApproved[_subtitleindex] = _to;
@@ -225,7 +224,7 @@ contract Subtitle_ERC721 is config{
 
 }
 
-contract Subtitle_Function is Subtitle_ERC721 {
+contract Subtitles_Function is Subtitles_ERC721 {
     constructor(address _oracleaddr,address[] memory arbiter) {
         Oracle = FlowOracleInterface(_oracleaddr); 
         Arbiter = arbiter;
@@ -280,7 +279,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         User[msg.sender].applyPoints += 1;
         videos[video_index].language.push(_language);
         ifapply[video_index][_language] == true;
-        emit applysubtitle(applyNumber,msg.sender,video_index,video_name,_language,pay_type,pay_number);
+        emit NewApply(applyNumber,msg.sender,video_index,video_name,_language,pay_type,pay_number);
         
     }
     
@@ -310,7 +309,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         videos[video_index].Applys[_language].VideoSubtitles.push(submitSubNumber);//引用传递.
         usersubmits[msg.sender]++;
         User[msg.sender].submitPoints += 1;
-        emit subtitlesubmit(submitSubNumber,video_index,video_name,_language);
+        emit NewSubtitling(submitSubNumber,video_index,video_name,_language);
         
     }
     //编辑功能
@@ -499,7 +498,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
          return true;
     }
     //只能对某个视频下的其中一个字幕作出点赞操作，但可以对多个字幕进行点踩操作，另外对同一字幕只能操作（赞或踩）一次且不能修改，
-    function topSum (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) {
+    function Top (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) {
         uint index = videos[video_index].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applyPoints = 100;
@@ -510,7 +509,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         require(User[msg.sender].creditPoints >= 60);
         require(onlyvoteone[msg.sender][video_index][_language] == false);//只能对视频的某一个字幕投票.
         require(userforsubvote[msg.sender][index] == false);//只能对某字幕投一次且不能更改，如何解决用户误触的问题.
-        require(videos[video_index].Applys[_language].IfSucess == false);//如果视频已经采纳了某字幕，则停止其踩赞功能.
+        require(videos[video_index].Applys[_language].IfSucess == false, "Confirmed");//如果视频已经采纳了某字幕，则停止其踩赞功能.
         subtitles[index].topSum++;//videos[_videoindex].VideoSubtitles[_subtitleindex].topSum++
         subtitles[index].topAddress.push(msg.sender);
         if (subtitles[index].iftaking == false && videos[video_index].Applys[_language].IfSucess == false) {
@@ -536,7 +535,7 @@ contract Subtitle_Function is Subtitle_ERC721 {
         userforsubvote[msg.sender][index] = true;
     }
     //当踩的数目达到一定比例，应将恶意字幕删除（置空）,同时给予上传者积分减去惩罚.
-    function stepSum (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
+    function Step (uint video_index,string memory _language,uint _subtitleindex) external onlyWhiteListUsr(msg.sender) returns(bool){
         uint index = videos[video_index].Applys[_language].VideoSubtitles[_subtitleindex];
         if(User[msg.sender].ifcreate == false) {
             User[msg.sender].applyPoints = 100;
