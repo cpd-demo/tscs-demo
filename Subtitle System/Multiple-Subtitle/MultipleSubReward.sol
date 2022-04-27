@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SimPL-2.0
-pragma solidity >= 0.4.25 < 0.8.5;
+pragma solidity >= 0.8.0;
 
 import "./ERC777/ERC777.sol";
 
@@ -16,22 +16,20 @@ interface SubtitleApplyInterface {
 }
 contract VideoToken is ERC777 {
     address CEO;
-    address Wallet;
     address subtitleapplyaddr;
     uint videoproportion;
     uint fbproportion;
     uint interval;
     uint totalpaytoken;
     uint totalvideotoken;
-    mapping(uint => VideoRecord) videosReward;
+    mapping(uint => VideoRecord) videos_mint;
     mapping(uint => bool) sell;
     mapping(uint => address) sellST;
     event videoTokenReceived(address video_wner,uint number);
     event subTokenReceived(address vide_owner,uint number,uint fb_number);
     event buySTsucess(uint ST_index,address ST_owner,address ST_newowner);
-    constructor(address[] memory defaultOperators,address payable wallet,uint initialSupply,uint _interval,uint _videoproportion,uint _fbproportion,address _oracleaddress,address _subtitleaddress) ERC777("VideoToken", "VT", defaultOperators,wallet,initialSupply)
+    constructor(uint _interval,uint _videoproportion,uint _fbproportion,address _oracleaddress,address _subtitleaddress) ERC777("VideoToken", "VT")
     {   
-          Wallet = wallet;
           CEO = msg.sender;
           videoproportion = _videoproportion;
           fbproportion = _fbproportion;
@@ -86,7 +84,7 @@ contract VideoToken is ERC777 {
     }
     //收益结算
     function getReward(uint video_index) public {
-    require(block.timestamp >= videosReward[video_index].lastgettime + interval); 
+    // require(block.timestamp >= videos_mint[video_index].lastgettime + interval); 
         uint newvideoflow;
         address videowner;
         bool applyif;
@@ -94,13 +92,12 @@ contract VideoToken is ERC777 {
         uint gettoken;
         (,newvideoflow,videowner) = FlowOracle.getFlow(video_index); 
         (applyif) = SubtitleApply.checkApply(video_index); 
-        totalvideotoken = (newvideoflow - videosReward[video_index].lastflow)*10**(18-videoproportion);
-        burnreward(Wallet,totalvideotoken);
+        totalvideotoken = (newvideoflow - videos_mint[video_index].lastflow)*10**(8-videoproportion);
         if (applyif == false){
             gettoken = totalvideotoken;
-            reward(videowner,gettoken);
-            videosReward[video_index].lastgettoken = gettoken;
-            videosReward[video_index].totalgettoken += gettoken;
+            _mint(videowner,gettoken);
+            videos_mint[video_index].lastgettoken = gettoken;
+            videos_mint[video_index].totalgettoken += gettoken;
             emit videoTokenReceived(videowner, gettoken);
         }else{     
            totalpaytoken = 0; 
@@ -113,13 +110,13 @@ contract VideoToken is ERC777 {
         }
         if (totalvideotoken > 0) {
                 gettoken = totalvideotoken - totalpaytoken;
-                reward(videowner,gettoken);
-                videosReward[video_index].lastgettoken = gettoken;
-                videosReward[video_index].totalgettoken += gettoken;
+                _mint(videowner,gettoken);
+                videos_mint[video_index].lastgettoken = gettoken;
+                videos_mint[video_index].totalgettoken += gettoken;
                 emit videoTokenReceived(videowner, gettoken);
         }
-        videosReward[video_index].lastflow = newvideoflow;
-        videosReward[video_index].lastgettime = block.timestamp;
+        videos_mint[video_index].lastflow = newvideoflow;
+        videos_mint[video_index].lastgettime = block.timestamp;
     }
     function loopGet(uint video_index,string memory _language) internal {
            uint paytype;
@@ -137,46 +134,46 @@ contract VideoToken is ERC777 {
                   (paytype,paynumber,subowner,fbaddress) = SubtitleApply.returnRewardInfo(video_index,_language);
                   if (paytype == 0) {
                       (,newsubflow) = FlowOracle.getSubFlow(video_index, _language);
-                      totalsubtoken = (newsubflow - videosReward[video_index].Record[_language].sublastflow)*10**(18-videoproportion);
-                      videosReward[video_index].Record[_language].sublastflow = newsubflow;
+                      totalsubtoken = (newsubflow - videos_mint[video_index].Record[_language].sublastflow)*10**(8-videoproportion);
+                      videos_mint[video_index].Record[_language].sublastflow = newsubflow;
                       subtokens = totalsubtoken/(10**paynumber);
-                      videosReward[video_index].Record[_language].surplus += subtokens;
-                      if(totalvideotoken >= videosReward[video_index].Record[_language].surplus) {    
-                            subtokens = videosReward[video_index].Record[_language].surplus;
-                            videosReward[video_index].Record[_language].surplus = 0;
+                      videos_mint[video_index].Record[_language].surplus += subtokens;
+                      if(totalvideotoken >= videos_mint[video_index].Record[_language].surplus) {    
+                            subtokens = videos_mint[video_index].Record[_language].surplus;
+                            videos_mint[video_index].Record[_language].surplus = 0;
                             totalvideotoken -= subtokens;
                         }else {
                             subtokens = totalvideotoken;
-                            videosReward[video_index].Record[_language].surplus -= subtokens;
+                            videos_mint[video_index].Record[_language].surplus -= subtokens;
                             totalvideotoken = 0;
                         }    
                       totalfbtoken = subtokens/(10**fbproportion);
                       fbtokens = totalfbtoken/fbaddress.length;
-                      reward(subowner,subtokens-totalfbtoken);
+                      _mint(subowner,subtokens-totalfbtoken);
                       for(uint fbid=0;fbid<fbaddress.length;fbid++){
-                         reward(fbaddress[fbid],fbtokens);
+                         _mint(fbaddress[fbid],fbtokens);
                       }
                   }else if(paytype == 1) {
-                           if (videosReward[video_index].Record[_language].create == false) {
-                           videosReward[video_index].Record[_language].surplus = paynumber*10**18;
-                           videosReward[video_index].Record[_language].create = true;
+                           if (videos_mint[video_index].Record[_language].create == false) {
+                           videos_mint[video_index].Record[_language].surplus = paynumber;
+                           videos_mint[video_index].Record[_language].create = true;
                            }
-                           if (videosReward[video_index].Record[_language].pay1success == false) {       
-                               if(totalvideotoken >= videosReward[video_index].Record[_language].surplus) {    
-                                  subtokens = videosReward[video_index].Record[_language].surplus;
-                                  videosReward[video_index].Record[_language].surplus = 0;
-                                  videosReward[video_index].Record[_language].pay1success = true;
+                           if (videos_mint[video_index].Record[_language].pay1success == false) {       
+                               if(totalvideotoken >= videos_mint[video_index].Record[_language].surplus) {    
+                                  subtokens = videos_mint[video_index].Record[_language].surplus;
+                                  videos_mint[video_index].Record[_language].surplus = 0;
+                                  videos_mint[video_index].Record[_language].pay1success = true;
                                   totalvideotoken -= subtokens;
                                 }else {
                                   subtokens = totalvideotoken;
-                                  videosReward[video_index].Record[_language].surplus = videosReward[video_index].Record[_language].surplus - subtokens;
+                                  videos_mint[video_index].Record[_language].surplus = videos_mint[video_index].Record[_language].surplus - subtokens;
                                   totalvideotoken = 0;
                                 }       
                                 totalfbtoken = subtokens/(10**fbproportion);
                                 fbtokens = totalfbtoken/fbaddress.length;
-                                reward(subowner,subtokens-totalfbtoken);
+                                _mint(subowner,subtokens-totalfbtoken);
                                 for(uint fbid=0;fbid<fbaddress.length;fbid++){
-                                    reward(fbaddress[fbid],fbtokens);
+                                    _mint(fbaddress[fbid],fbtokens);
                                 }              
                             }
                     }
